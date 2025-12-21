@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "533334002124",
+    "project_id": "cnt-media-platform",
+    "storage_bucket": "cnt-media-platform.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533334002124:android:79b714cde2992f6d4d7569",
+        "android_client_info": {
+          "package_name": "com.christtabernacle.cntmedia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBlA8cEmBfuEEWgbE09uXZx9GYktjBbbWk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
