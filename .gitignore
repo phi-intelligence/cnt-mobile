@@ -15,3 +15,4 @@ upload-keystore.jks
 .idea/
 *.iml
 /mobile/frontend/dev_docs
+/mobile/dev_docs
