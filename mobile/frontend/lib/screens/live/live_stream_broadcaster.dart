@@ -4,6 +4,7 @@ import '../../services/livekit_meeting_service.dart';
 import '../../widgets/meeting/video_track_view.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../utils/app_logger.dart';
 
 /// Live Stream Broadcaster Screen - Go live and broadcast using LiveKit
 class LiveStreamBroadcaster extends StatefulWidget {
@@ -112,7 +113,7 @@ class _LiveStreamBroadcasterState extends State<LiveStreamBroadcaster> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      print('Error stopping stream: $e');
+      AppLogger.debug('Error stopping stream: $e');
     }
   }
 

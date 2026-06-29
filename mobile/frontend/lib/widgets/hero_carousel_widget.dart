@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
 import '../theme/app_typography.dart';
+import '../utils/app_logger.dart';
 
 /// Hero Carousel Widget - Image carousel with latest community posts
 /// Auto-scrolling carousel displaying images from community posts
@@ -79,7 +80,7 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
 
   Future<void> _loadItems() async {
     try {
-      print('🖼️ Hero Carousel: Fetching approved community posts with images...');
+      AppLogger.debug('🖼️ Hero Carousel: Fetching approved community posts with images...');
       final apiService = ApiService();
       
       // Fetch latest approved community posts (backend filters by approved_only=true and image_url)
@@ -87,7 +88,7 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
         limit: 20,
         approvedOnly: true,  // Only show approved posts
       );
-      print('🖼️ Hero Carousel: Fetched ${posts.length} approved community posts');
+      AppLogger.debug('🖼️ Hero Carousel: Fetched ${posts.length} approved community posts');
       
       // Convert posts to carousel items (backend already filters by image_url)
       final items = <_CarouselItem>[];
@@ -96,7 +97,7 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
         if (imageUrl != null && imageUrl.isNotEmpty) {
           // Get full media URL (handles both regular images and generated quote images)
           final fullImageUrl = apiService.getMediaUrl(imageUrl);
-          print('🖼️ Hero Carousel: Post ${post['id']} - Original: $imageUrl, Full URL: $fullImageUrl');
+          AppLogger.debug('🖼️ Hero Carousel: Post ${post['id']} - Original: $imageUrl, Full URL: $fullImageUrl');
           
           items.add(_CarouselItem(
             id: post['id'].toString(),
@@ -110,7 +111,7 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
         }
       }
       
-      print('🖼️ Hero Carousel: Found ${items.length} approved posts with images');
+      AppLogger.debug('🖼️ Hero Carousel: Found ${items.length} approved posts with images');
       
       if (mounted) {
         setState(() {
@@ -125,13 +126,13 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
         }
       }
     } catch (e, stackTrace) {
-      print('❌ Hero Carousel: Error loading items: $e');
-      print('❌ Hero Carousel: Stack trace: $stackTrace');
+      AppLogger.debug('❌ Hero Carousel: Error loading items: $e');
+      AppLogger.debug('❌ Hero Carousel: Stack trace: $stackTrace');
       if (e.toString().contains('TimeoutException')) {
-        print('⚠️  Connection timeout! Make sure:');
-        print('   1. Backend is running on port 8002');
-        print('   2. For physical devices, use: --dart-define=API_BASE=http://192.168.0.14:8002/api/v1');
-        print('   3. Device and computer are on the same network');
+        AppLogger.debug('⚠️  Connection timeout! Make sure:');
+        AppLogger.debug('   1. Backend is running on port 8002');
+        AppLogger.debug('   2. For physical devices, use: --dart-define=API_BASE=http://192.168.0.14:8002/api/v1');
+        AppLogger.debug('   3. Device and computer are on the same network');
       }
       if (mounted) {
         setState(() {
@@ -405,7 +406,7 @@ class _HeroCarouselWidgetState extends State<HeroCarouselWidget>
             ),
           ),
           errorWidget: (context, url, error) {
-            print('❌ Hero Carousel: Error loading image ${item.imageUrl}: $error');
+            AppLogger.debug('❌ Hero Carousel: Error loading image ${item.imageUrl}: $error');
             return Container(
               height: height,
               color: Colors.black,

@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'dart:io';
 import '../../theme/app_spacing.dart';
 import 'video_preview_screen.dart';
+import '../../utils/app_logger.dart';
 
 /// Video Recording Screen - Record video podcasts
 class VideoRecordingScreen extends StatefulWidget {
@@ -138,7 +139,7 @@ class _VideoRecordingScreenState extends State<VideoRecordingScreen> {
         );
       }
     } catch (e) {
-      print('Error stopping video recording: $e');
+      AppLogger.debug('Error stopping video recording: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error stopping recording: $e')),

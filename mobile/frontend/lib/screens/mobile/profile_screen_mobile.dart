@@ -24,6 +24,7 @@ import 'downloads_screen_mobile.dart';
 import 'notifications_screen_mobile.dart';
 import 'about_screen_mobile.dart';
 import '../donation_modal.dart';
+import '../../utils/app_logger.dart';
 
 class ProfileScreenMobile extends StatefulWidget {
   const ProfileScreenMobile({super.key});
@@ -39,7 +40,7 @@ class _ProfileScreenMobileState extends State<ProfileScreenMobile> {
   @override
   void initState() {
     super.initState();
-    print('✅ ProfileScreenMobile initState');
+    AppLogger.debug('✅ ProfileScreenMobile initState');
     // Fetch user data on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -49,7 +50,7 @@ class _ProfileScreenMobileState extends State<ProfileScreenMobile> {
         // Also try to fetch artist profile (will fail silently if user is not an artist)
         context.read<ArtistProvider>().fetchMyArtist();
       } catch (e) {
-        print('❌ ProfileScreenMobile: Error fetching user: $e');
+        AppLogger.debug('❌ ProfileScreenMobile: Error fetching user: $e');
       }
     });
   }

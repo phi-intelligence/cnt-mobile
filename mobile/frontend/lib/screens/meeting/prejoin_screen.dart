@@ -9,6 +9,7 @@ import 'meeting_room_screen.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/media_utils.dart';
+import '../../utils/app_logger.dart';
 
 /// Prejoin Screen - Device check before joining meeting
 /// Allows user to toggle camera/mic before joining
@@ -91,7 +92,7 @@ class _PrejoinScreenState extends State<PrejoinScreen> {
         });
       }
     } catch (e) {
-      print('Error initializing camera: $e');
+      AppLogger.debug('Error initializing camera: $e');
       if (mounted) {
         setState(() {
           _isCameraInitializing = false;

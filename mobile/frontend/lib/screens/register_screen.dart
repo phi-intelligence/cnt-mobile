@@ -10,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/shared/pill_text_field.dart';
+import '../utils/security_hardening.dart';
 import 'user_login_screen.dart';
 
 /// Register Screen - Redesigned to match Web Register Screen style
@@ -326,7 +327,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SecureScreen(
+      child: Scaffold(
       backgroundColor: const Color(0xFFF5F0E8),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -738,6 +740,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

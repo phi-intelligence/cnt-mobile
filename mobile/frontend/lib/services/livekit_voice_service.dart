@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:livekit_client/livekit_client.dart' as lk;
 import 'api_service.dart';
+import '../utils/app_logger.dart';
 
 /// Service for managing LiveKit voice agent connections
 class LiveKitVoiceService {
@@ -36,7 +37,7 @@ class LiveKitVoiceService {
     while (attempt < maxRetries) {
     try {
         attempt++;
-        print('🎤 LiveKit: Connection attempt $attempt/$maxRetries for room: $roomName');
+        AppLogger.debug('🎤 LiveKit: Connection attempt $attempt/$maxRetries for room: $roomName');
       
         // Get access token from backend with timeout
       final tokenResponse = await _apiService.getLiveKitVoiceToken(
@@ -58,8 +59,8 @@ class LiveKitVoiceService {
       // Frontend knows the correct IP for the device (192.168.0.14 for physical devices)
       final wsUrl = _apiService.getLiveKitUrl();
       
-      print('🎤 LiveKit: Token received, connecting to $wsUrl');
-      print('🎤 LiveKit: Backend suggested URL: ${tokenResponse['ws_url']} (ignored for device compatibility)');
+      AppLogger.debug('🎤 LiveKit: Token received, connecting to $wsUrl');
+      AppLogger.debug('🎤 LiveKit: Backend suggested URL: ${tokenResponse['ws_url']} (ignored for device compatibility)');
       
       // Create room with audio-only options
       final roomOptions = lk.RoomOptions(
@@ -81,7 +82,7 @@ class LiveKitVoiceService {
           },
         );
       
-        print('🎤 LiveKit: Connected to room successfully');
+        AppLogger.debug('🎤 LiveKit: Connected to room successfully');
       
       // Set up event listener
       _listener = _room!.createListener();
@@ -90,7 +91,7 @@ class LiveKitVoiceService {
       // Enable microphone
       if (_room != null && _room!.localParticipant != null) {
         await _room!.localParticipant!.setMicrophoneEnabled(true);
-          print('🎤 LiveKit: Microphone enabled');
+          AppLogger.debug('🎤 LiveKit: Microphone enabled');
       }
       
       _isConnected = true;
@@ -101,20 +102,20 @@ class LiveKitVoiceService {
         
       } on TimeoutException catch (e) {
         lastError = e;
-        print('❌ LiveKit: Connection timeout (attempt $attempt/$maxRetries): $e');
+        AppLogger.debug('❌ LiveKit: Connection timeout (attempt $attempt/$maxRetries): $e');
         if (attempt < maxRetries) {
           // Exponential backoff: 1s, 2s, 4s
           final delaySeconds = 1 << (attempt - 1);
-          print('🔄 LiveKit: Retrying in ${delaySeconds}s...');
+          AppLogger.debug('🔄 LiveKit: Retrying in ${delaySeconds}s...');
           await Future.delayed(Duration(seconds: delaySeconds));
         }
     } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
-        print('❌ LiveKit: Connection error (attempt $attempt/$maxRetries): $e');
+        AppLogger.debug('❌ LiveKit: Connection error (attempt $attempt/$maxRetries): $e');
         if (attempt < maxRetries) {
           // Exponential backoff: 1s, 2s, 4s
           final delaySeconds = 1 << (attempt - 1);
-          print('🔄 LiveKit: Retrying in ${delaySeconds}s...');
+          AppLogger.debug('🔄 LiveKit: Retrying in ${delaySeconds}s...');
           await Future.delayed(Duration(seconds: delaySeconds));
         }
       } finally {
@@ -145,23 +146,23 @@ class LiveKitVoiceService {
     // Participant events
     _listener!
       ..on<lk.ParticipantConnectedEvent>((event) {
-        print('🎤 LiveKit: Participant connected: ${event.participant.identity}');
+        AppLogger.debug('🎤 LiveKit: Participant connected: ${event.participant.identity}');
         if (event.participant.kind == lk.ParticipantKind.AGENT) {
           _onAgentConnected(event.participant as lk.RemoteParticipant);
         }
       })
       ..on<lk.ParticipantDisconnectedEvent>((event) {
-        print('🎤 LiveKit: Participant disconnected: ${event.participant.identity}');
+        AppLogger.debug('🎤 LiveKit: Participant disconnected: ${event.participant.identity}');
         if (event.participant.kind == lk.ParticipantKind.AGENT) {
           _onAgentDisconnected();
         }
       })
       ..on<lk.TrackSubscribedEvent>((event) {
-        print('🎤 LiveKit: Track subscribed: ${event.track.kind}, participant: ${event.participant.identity}, kind: ${event.participant.kind}');
+        AppLogger.debug('🎤 LiveKit: Track subscribed: ${event.track.kind}, participant: ${event.participant.identity}, kind: ${event.participant.kind}');
         if (event.participant.kind == lk.ParticipantKind.AGENT) {
           if (event.track.kind == lk.TrackType.AUDIO) {
             final audioTrack = event.track as lk.RemoteAudioTrack;
-            print('🎤 LiveKit: Agent audio track subscribed - sid: ${audioTrack.sid}');
+            AppLogger.debug('🎤 LiveKit: Agent audio track subscribed - sid: ${audioTrack.sid}');
             _onAgentAudioTrack(audioTrack);
           }
         }
@@ -179,7 +180,7 @@ class LiveKitVoiceService {
         }
       })
       ..on<lk.RoomDisconnectedEvent>((_) {
-        print('🎤 LiveKit: Room disconnected');
+        AppLogger.debug('🎤 LiveKit: Room disconnected');
         _isConnected = false;
         _connectionStateController.add(lk.ConnectionState.disconnected);
       });
@@ -192,18 +193,18 @@ class LiveKitVoiceService {
   }
   
   void _onAgentConnected(lk.RemoteParticipant agent) {
-    print('🎤 LiveKit: Agent connected, identity: ${agent.identity}, kind: ${agent.kind}');
-    print('🎤 LiveKit: Agent metadata: ${agent.metadata}');
+    AppLogger.debug('🎤 LiveKit: Agent connected, identity: ${agent.identity}, kind: ${agent.kind}');
+    AppLogger.debug('🎤 LiveKit: Agent metadata: ${agent.metadata}');
     
     // Function to parse and update agent state from metadata
     void updateAgentStateFromMetadata(String? metadata) {
-      print('🎤 LiveKit: Updating agent state from metadata: $metadata');
+      AppLogger.debug('🎤 LiveKit: Updating agent state from metadata: $metadata');
       if (metadata == null || metadata.isEmpty) {
         // If no metadata, check if we have audio tracks (agent is ready)
         // Don't set to initializing if agent has audio tracks
         final hasAudioTracks = agent.audioTrackPublications.isNotEmpty;
         if (hasAudioTracks) {
-          print('🎤 LiveKit: Agent has audio tracks but no metadata, setting to listening');
+          AppLogger.debug('🎤 LiveKit: Agent has audio tracks but no metadata, setting to listening');
           _agentStateController.add('listening');
         } else {
           _agentStateController.add('initializing');
@@ -281,22 +282,22 @@ class LiveKitVoiceService {
   }
   
   void _onAgentAudioTrack(lk.RemoteAudioTrack track) {
-    print('🎤 LiveKit: Agent audio track ready - sid: ${track.sid}');
+    AppLogger.debug('🎤 LiveKit: Agent audio track ready - sid: ${track.sid}');
     
     try {
       // On web, LiveKit SDK automatically attaches tracks to HTML audio elements
       // The track should start playing automatically once subscribed
       // The SDK handles all audio playback internally
-      print('🎤 LiveKit: Agent audio track is ready for playback');
-      print('🎤 LiveKit: Track details - sid: ${track.sid}, kind: ${track.kind}');
-      print('🎤 LiveKit: Audio track should now be playing in browser automatically');
-      print('🎤 LiveKit: If no audio, check browser console for autoplay restrictions');
+      AppLogger.debug('🎤 LiveKit: Agent audio track is ready for playback');
+      AppLogger.debug('🎤 LiveKit: Track details - sid: ${track.sid}, kind: ${track.kind}');
+      AppLogger.debug('🎤 LiveKit: Audio track should now be playing in browser automatically');
+      AppLogger.debug('🎤 LiveKit: If no audio, check browser console for autoplay restrictions');
       
       // Update state to indicate agent is ready (since we have audio track)
       // The agent should be speaking or listening now
       _agentStateController.add('listening');
     } catch (e) {
-      print('⚠️ LiveKit: Error handling agent audio track: $e');
+      AppLogger.debug('⚠️ LiveKit: Error handling agent audio track: $e');
     }
   }
   
@@ -309,7 +310,7 @@ class LiveKitVoiceService {
         _transcriptController.add(text);
       }
     } catch (e) {
-      print('⚠️ LiveKit: Error decoding agent data: $e');
+      AppLogger.debug('⚠️ LiveKit: Error decoding agent data: $e');
     }
   }
   
@@ -328,7 +329,7 @@ class LiveKitVoiceService {
       _isConnected = false;
       _connectionStateController.add(lk.ConnectionState.disconnected);
     } catch (e) {
-      print('❌ LiveKit: Disconnect error: $e');
+      AppLogger.debug('❌ LiveKit: Disconnect error: $e');
     }
   }
   

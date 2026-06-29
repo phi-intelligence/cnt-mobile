@@ -21,6 +21,7 @@ import '../theme/app_theme.dart';
 import '../widgets/meeting/pip_meeting_overlay.dart';
 import 'mobile_navigation.dart';
 import '../screens/splash_screen.dart';
+import '../utils/app_logger.dart';
 
 /// Mobile-only App Router
 /// Web platform is handled by the separate deployed web frontend
@@ -36,7 +37,7 @@ class _AppRouterState extends State<AppRouter> {
   @override
   void initState() {
     super.initState();
-    print('✅ AppRouter initState');
+    AppLogger.debug('✅ AppRouter initState');
     // Initialize WebSocket connection asynchronously after first frame
     // This prevents blocking the build method and handles errors gracefully
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -47,20 +48,20 @@ class _AppRouterState extends State<AppRouter> {
 
   void _initializeWebSocket() async {
     try {
-      print('✅ AppRouter: Initializing WebSocket...');
+      AppLogger.debug('✅ AppRouter: Initializing WebSocket...');
       await WebSocketService().connect();
-      print('✅ AppRouter: WebSocket connected');
+      AppLogger.debug('✅ AppRouter: WebSocket connected');
     } catch (e, stackTrace) {
       // Log error but don't crash the app
       // WebSocket connection is non-critical for app functionality
-      print('❌ AppRouter: WebSocket connection failed (non-critical): $e');
-      print('Stack trace: $stackTrace');
+      AppLogger.debug('❌ AppRouter: WebSocket connection failed (non-critical): $e');
+      AppLogger.debug('Stack trace: $stackTrace');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    print('✅ AppRouter: Building mobile navigation...');
+    AppLogger.debug('✅ AppRouter: Building mobile navigation...');
     
     return MultiProvider(
       providers: [

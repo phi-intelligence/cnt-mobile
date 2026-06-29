@@ -6,6 +6,7 @@ import '../../models/api_models.dart';
 import '../../models/content_item.dart';
 import '../../widgets/shared/loading_shimmer.dart';
 import '../../widgets/shared/content_section.dart';
+import '../../utils/app_logger.dart';
 
 class PodcastsScreenMobile extends StatefulWidget {
   const PodcastsScreenMobile({super.key});
@@ -59,7 +60,7 @@ class _PodcastsScreenMobileState extends State<PodcastsScreenMobile> {
         );
       }).where((p) => p.audioUrl != null && p.audioUrl!.isNotEmpty).toList();
     } catch (e) {
-      print('Error fetching podcasts: $e');
+      AppLogger.debug('Error fetching podcasts: $e');
     } finally {
       if (mounted) {
         setState(() {

@@ -10,6 +10,7 @@ import '../../widgets/community/instagram_post_card.dart';
 import '../../utils/format_utils.dart';
 import '../community/comment_screen.dart';
 import '../community/create_post_screen.dart';
+import '../../utils/app_logger.dart';
 
 class CommunityScreenMobile extends StatefulWidget {
   final int? postId; // Optional postId to scroll to
@@ -28,14 +29,14 @@ class _CommunityScreenMobileState extends State<CommunityScreenMobile> {
   @override
   void initState() {
     super.initState();
-    print('✅ CommunityScreenMobile initState');
+    AppLogger.debug('✅ CommunityScreenMobile initState');
     // Fetch posts on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       try {
         context.read<CommunityProvider>().fetchPosts(refresh: true);
       } catch (e) {
-        print('❌ CommunityScreenMobile: Error fetching posts: $e');
+        AppLogger.debug('❌ CommunityScreenMobile: Error fetching posts: $e');
       }
     });
     
@@ -71,7 +72,7 @@ class _CommunityScreenMobileState extends State<CommunityScreenMobile> {
     });
     
     if (index < 0) {
-      print('⚠️ Post $postId not found in list');
+      AppLogger.debug('⚠️ Post $postId not found in list');
       return;
     }
     

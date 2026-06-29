@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 class PlaylistProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -22,7 +23,7 @@ class PlaylistProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to load playlists: $e';
-      print('Error fetching playlists: $e');
+      AppLogger.debug('Error fetching playlists: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

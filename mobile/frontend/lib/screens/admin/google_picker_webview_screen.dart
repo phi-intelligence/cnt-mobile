@@ -1,15 +1,15 @@
-import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import '../../services/api_service.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
 
-/// Screen that opens Google Picker API in a WebView
-/// This allows users to directly select files from Google Drive
+import '../../services/api_service.dart';
+import '../../utils/app_logger.dart';
+
+/// Google Drive file picker with hardened WebView settings.
 class GooglePickerWebViewScreen extends StatefulWidget {
-  final String? fileType; // "audio", "video"
-  final Function(String fileId, String fileName, String mimeType) onFileSelected;
+  final String? fileType;
+  final void Function(String fileId, String fileName, String mimeType) onFileSelected;
 
   const GooglePickerWebViewScreen({
     super.key,
@@ -18,13 +18,26 @@ class GooglePickerWebViewScreen extends StatefulWidget {
   });
 
   @override
-  State<GooglePickerWebViewScreen> createState() => _GooglePickerWebViewScreenState();
+  State<GooglePickerWebViewScreen> createState() =>
+      _GooglePickerWebViewScreenState();
 }
 
 class _GooglePickerWebViewScreenState extends State<GooglePickerWebViewScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   final ApiService _api = ApiService();
   bool _isLoading = true;
+  String? _accessToken;
+  String? _clientId;
+
+  static const _allowedHosts = {
+    'accounts.google.com',
+    'apis.google.com',
+    'www.googleapis.com',
+    'docs.google.com',
+    'drive.google.com',
+    'ssl.gstatic.com',
+    'www.gstatic.com',
+  };
 
   @override
   void initState() {
@@ -33,192 +46,174 @@ class _GooglePickerWebViewScreenState extends State<GooglePickerWebViewScreen> {
   }
 
   Future<void> _initializeWebView() async {
-    final htmlContent = await _buildPickerHtml();
-    
+    try {
+      final tokenData = await _api.getGoogleDrivePickerToken();
+      _accessToken = tokenData['access_token'] as String?;
+      _clientId = tokenData['client_id'] as String?;
+    } catch (e) {
+      AppLogger.error('Failed to load Google Drive picker token', error: e);
+    }
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
+          onNavigationRequest: (request) {
+            final uri = Uri.tryParse(request.url);
+            if (uri == null) return NavigationDecision.prevent;
+            if (uri.scheme == 'about' || uri.scheme == 'data') {
+              return NavigationDecision.navigate;
+            }
+            if (uri.scheme != 'https') return NavigationDecision.prevent;
+            final host = uri.host.toLowerCase();
+            final allowed = _allowedHosts.any(
+              (h) => host == h || host.endsWith('.$h'),
+            );
+            return allowed
+                ? NavigationDecision.navigate
+                : NavigationDecision.prevent;
           },
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
+          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageFinished: (_) async {
+            setState(() => _isLoading = false);
+            await _injectPickerToken();
           },
-          onWebResourceError: (WebResourceError error) {
-            print('WebView error: ${error.description}');
-            setState(() {
-              _isLoading = false;
-            });
+          onWebResourceError: (error) {
+            AppLogger.warning('WebView error: ${error.description}');
+            setState(() => _isLoading = false);
           },
         ),
       )
       ..addJavaScriptChannel(
         'FilePicker',
         onMessageReceived: (JavaScriptMessage message) {
-          // Handle file selection from JavaScript
-          try {
-            final data = message.message;
-            // Parse the message (format: "fileId|fileName|mimeType")
-            final parts = data.split('|');
-            if (parts.length == 3) {
-              widget.onFileSelected(parts[0], parts[1], parts[2]);
-              Navigator.pop(context);
-            }
-          } catch (e) {
-            print('Error parsing file selection: $e');
-          }
+          _handlePickerMessage(message.message);
         },
       )
-      ..loadHtmlString(htmlContent);
+      ..loadHtmlString(_buildPickerShellHtml());
   }
 
-  Future<String> _buildPickerHtml() async {
-    // Get OAuth token from backend
-    String accessToken = '';
-    String clientId = '';
-    
+  @override
+  void dispose() {
+    _clearPickerToken();
+    super.dispose();
+  }
+
+  Future<void> _clearPickerToken() async {
+    final controller = _controller;
+    if (controller == null) return;
     try {
-      final tokenData = await _api.getGoogleDrivePickerToken();
-      accessToken = tokenData['access_token'] as String;
-      clientId = tokenData['client_id'] as String;
+      await controller.runJavaScript(
+        'window.__pickerToken = null; window.__pickerClientId = null;',
+      );
     } catch (e) {
-      // If token not available, show error
-      return '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      margin: 0;
-      padding: 40px 20px;
-      font-family: Arial, sans-serif;
-      text-align: center;
+      AppLogger.debug('Failed to clear picker token', error: e);
     }
-  </style>
-</head>
-<body>
-  <h2>Error</h2>
-  <p>Failed to get Google Drive access token. Please connect to Google Drive first.</p>
-</body>
-</html>
-      ''';
+  }
+
+  Future<void> _injectPickerToken() async {
+    if (_accessToken == null || _accessToken!.isEmpty) return;
+    final controller = _controller;
+    if (controller == null) return;
+
+    final viewType = widget.fileType == 'video'
+        ? 'google.picker.ViewId.VIDEOS'
+        : 'google.picker.ViewId.DOCS';
+
+    final tokenJson = jsonEncode(_accessToken);
+    final clientJson = jsonEncode(_clientId ?? '');
+
+    await controller.runJavaScript('''
+      window.__pickerToken = $tokenJson;
+      window.__pickerClientId = $clientJson;
+      window.__pickerViewType = $viewType;
+      if (typeof window.initSecurePicker === 'function') {
+        window.initSecurePicker();
+      }
+    ''');
+  }
+
+  void _handlePickerMessage(String raw) {
+    final parts = raw.split('|');
+    if (parts.length != 3) {
+      AppLogger.warning('Invalid picker message format');
+      return;
     }
 
-    // Determine view type based on file type
-    String viewType = 'google.picker.ViewId.DOCS';
-    if (widget.fileType == 'audio') {
-      viewType = 'google.picker.ViewId.DOCS';
-    } else if (widget.fileType == 'video') {
-      viewType = 'google.picker.ViewId.VIDEOS';
-    }
+    final fileId = parts[0].trim();
+    final fileName = parts[1].trim();
+    final mimeType = parts[2].trim();
 
+    if (fileId.isEmpty || fileId.length > 128) return;
+    if (fileName.isEmpty || fileName.length > 512) return;
+    if (mimeType.length > 128) return;
+    if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(fileId)) return;
+
+    widget.onFileSelected(fileId, fileName, mimeType);
+    _clearPickerToken();
+    if (mounted) Navigator.pop(context);
+  }
+
+  String _buildPickerShellHtml() {
     return '''
 <!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' https://apis.google.com https://www.gstatic.com https://ssl.gstatic.com; script-src https://apis.google.com; style-src 'unsafe-inline';">
   <script src="https://apis.google.com/js/api.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-    }
-    #picker-container {
-      text-align: center;
-      padding: 40px 20px;
-    }
-    button {
-      background: #4285f4;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      font-size: 16px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #357ae8;
-    }
-    #status {
-      margin-top: 20px;
-      color: #666;
-    }
+    body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5; text-align: center; }
+    #status { margin-top: 20px; color: #666; }
   </style>
 </head>
 <body>
-  <div id="picker-container">
-    <h2>Google Drive File Picker</h2>
-    <button onclick="loadPicker()">Select File from Google Drive</button>
-    <div id="status"></div>
-  </div>
-
+  <h2>Google Drive File Picker</h2>
+  <div id="status">Initializing secure picker...</div>
   <script>
     let pickerApiLoaded = false;
-    const oauthToken = '$accessToken';
-    const clientId = '$clientId';
 
     function onApiLoad() {
-      gapi.load('picker', {'callback': onPickerApiLoad});
+      gapi.load('picker', { callback: onPickerApiLoad });
     }
 
     function onPickerApiLoad() {
       pickerApiLoaded = true;
-      // Auto-open picker when ready
-      loadPicker();
+      if (window.__pickerToken) initSecurePicker();
     }
 
-    function loadPicker() {
-      if (!pickerApiLoaded) {
-        document.getElementById('status').innerHTML = 'Loading picker...';
-        setTimeout(loadPicker, 100);
+    function initSecurePicker() {
+      if (!pickerApiLoaded) return;
+      const token = window.__pickerToken;
+      if (!token) {
+        document.getElementById('status').innerHTML = 'Error: token not available';
         return;
       }
-
-      if (!oauthToken) {
-        document.getElementById('status').innerHTML = 'Error: No access token available';
-        return;
-      }
-
-      // Create picker
+      const viewType = window.__pickerViewType || google.picker.ViewId.DOCS;
       const picker = new google.picker.PickerBuilder()
-        .addView(${viewType})
-        .setOAuthToken(oauthToken)
+        .addView(viewType)
+        .setOAuthToken(token)
         .setCallback(pickerCallback)
         .build();
-      
       picker.setVisible(true);
+      document.getElementById('status').innerHTML = '';
+      window.__pickerToken = null;
     }
+    window.initSecurePicker = initSecurePicker;
 
     function pickerCallback(data) {
       if (data.action === google.picker.Action.PICKED) {
         const file = data.docs[0];
-        // Send file info to Flutter
         FilePicker.postMessage(file.id + '|' + file.name + '|' + (file.mimeType || ''));
-      } else if (data.action === google.picker.Action.CANCEL) {
-        document.getElementById('status').innerHTML = 'Selection cancelled';
-        // Close after a delay
-        setTimeout(() => {
-          window.close();
-        }, 1000);
       }
     }
 
-    // Load the API
-    window.onload = function() {
-      onApiLoad();
-    };
+    window.onload = onApiLoad;
   </script>
 </body>
 </html>
-    ''';
+''';
   }
 
   @override
@@ -233,17 +228,20 @@ class _GooglePickerWebViewScreenState extends State<GooglePickerWebViewScreen> {
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            Container(
+          if (_controller != null)
+            WebViewWidget(controller: _controller!)
+          else
+            const ColoredBox(
               color: Colors.white,
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_isLoading && _controller != null)
+            const ColoredBox(
+              color: Colors.white,
+              child: Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
     );
   }
 }
-

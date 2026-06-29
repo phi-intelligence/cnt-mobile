@@ -12,6 +12,7 @@ import '../theme/app_typography.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/shared/content_section.dart';
 import 'video/video_player_full_screen.dart';
+import '../utils/app_logger.dart';
 
 /// Movie Detail Screen - Full movie information with play option
 class MovieDetailScreen extends StatefulWidget {
@@ -86,7 +87,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error initializing preview: $e');
+      AppLogger.debug('Error initializing preview: $e');
       if (mounted) {
         setState(() {
           _isPreviewLoading = false;
@@ -133,7 +134,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error loading movie: $e');
+      AppLogger.debug('Error loading movie: $e');
       setState(() {
         _isLoading = false;
       });
@@ -156,7 +157,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         _isLoadingSimilar = false;
       });
     } catch (e) {
-      print('Error loading similar movies: $e');
+      AppLogger.debug('Error loading similar movies: $e');
       setState(() {
         _isLoadingSimilar = false;
       });

@@ -6,6 +6,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/content_item.dart';
 import 'api_service.dart';
+import '../utils/app_logger.dart';
+import '../utils/pinned_http_client.dart';
 
 /// Download status enum
 enum DownloadStatus {
@@ -54,7 +56,7 @@ class DownloadService {
 
   Future<Database> _initDatabase() async {
     try {
-      print('✅ DownloadService: Initializing database...');
+      AppLogger.debug('✅ DownloadService: Initializing database...');
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = join(documentsDirectory.path, 'downloads.db');
 
@@ -86,10 +88,10 @@ class DownloadService {
           }
         },
       );
-      print('✅ DownloadService: Database initialized successfully');
+      AppLogger.debug('✅ DownloadService: Database initialized successfully');
       return db;
     } catch (e) {
-      print('❌ DownloadService: Error initializing database: $e');
+      AppLogger.debug('❌ DownloadService: Error initializing database: $e');
       rethrow;
     }
   }
@@ -146,11 +148,10 @@ class DownloadService {
 
       // Create HTTP client for streaming download
       final request = http.Request('GET', Uri.parse(mediaUrl));
-      final client = http.Client();
+      final client = PinnedHttpClient.instance;
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
-        client.close();
         _emitProgress(item.id, 0.0, DownloadStatus.failed,
             error: 'HTTP ${response.statusCode}');
         return false;
@@ -169,8 +170,6 @@ class DownloadService {
         _emitProgress(item.id, progress, DownloadStatus.downloading);
         onProgress?.call(progress);
       }
-
-      client.close();
 
       // Determine file extension
       final extension = mediaType == 'video' ? 'mp4' : 'mp3';
@@ -198,7 +197,7 @@ class DownloadService {
 
       return true;
     } catch (e) {
-      print('Error downloading content: $e');
+      AppLogger.debug('Error downloading content: $e');
       _downloadStatuses[item.id] = DownloadStatus.failed;
       _emitProgress(item.id, 0.0, DownloadStatus.failed, error: e.toString());
       return false;
@@ -223,7 +222,7 @@ class DownloadService {
         orderBy: 'downloaded_at DESC',
       );
     } catch (e) {
-      print('Error getting downloads: $e');
+      AppLogger.debug('Error getting downloads: $e');
       return [];
     }
   }
@@ -256,7 +255,7 @@ class DownloadService {
       
       return true;
     } catch (e) {
-      print('Error deleting download: $e');
+      AppLogger.debug('Error deleting download: $e');
       return false;
     }
   }

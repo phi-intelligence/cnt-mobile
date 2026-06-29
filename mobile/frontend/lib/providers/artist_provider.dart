@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/artist.dart';
 import '../models/content_item.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 /// Provider for managing artist profiles and content
 /// 
@@ -57,7 +58,7 @@ class ArtistProvider with ChangeNotifier {
     } catch (e) {
       _myArtistError = e.toString();
       _hasArtistProfile = false;
-      print('Error fetching my artist: $e');
+      AppLogger.debug('Error fetching my artist: $e');
     } finally {
       _myArtistLoading = false;
       notifyListeners();
@@ -87,7 +88,7 @@ class ArtistProvider with ChangeNotifier {
       }
     } catch (e) {
       _artistErrors[artistId] = e.toString();
-      print('Error fetching artist $artistId: $e');
+      AppLogger.debug('Error fetching artist $artistId: $e');
     } finally {
       _artistLoading[artistId] = false;
       notifyListeners();
@@ -104,7 +105,7 @@ class ArtistProvider with ChangeNotifier {
       notifyListeners();
       return artist;
     } catch (e) {
-      print('Error fetching artist by user ID $userId: $e');
+      AppLogger.debug('Error fetching artist by user ID $userId: $e');
       return null;
     }
   }
@@ -126,7 +127,7 @@ class ArtistProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('Error updating artist: $e');
+      AppLogger.debug('Error updating artist: $e');
       return false;
     }
   }
@@ -147,7 +148,7 @@ class ArtistProvider with ChangeNotifier {
       await fetchMyArtist();
       return true;
     } catch (e) {
-      print('Error uploading cover image: $e');
+      AppLogger.debug('Error uploading cover image: $e');
       return false;
     }
   }
@@ -168,7 +169,7 @@ class ArtistProvider with ChangeNotifier {
       final podcasts = await _apiService.getArtistPodcasts(artistId);
       _artistPodcastsCache[artistId] = podcasts;
     } catch (e) {
-      print('Error fetching artist podcasts: $e');
+      AppLogger.debug('Error fetching artist podcasts: $e');
       _artistPodcastsCache[artistId] = [];
     } finally {
       _artistPodcastsLoading[artistId] = false;
@@ -187,7 +188,7 @@ class ArtistProvider with ChangeNotifier {
       notifyListeners();
       return success;
     } catch (e) {
-      print('Error following artist: $e');
+      AppLogger.debug('Error following artist: $e');
       return false;
     }
   }
@@ -203,7 +204,7 @@ class ArtistProvider with ChangeNotifier {
       notifyListeners();
       return success;
     } catch (e) {
-      print('Error unfollowing artist: $e');
+      AppLogger.debug('Error unfollowing artist: $e');
       return false;
     }
   }

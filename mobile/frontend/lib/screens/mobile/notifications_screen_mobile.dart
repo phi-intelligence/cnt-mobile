@@ -6,6 +6,7 @@ import '../../widgets/shared/loading_shimmer.dart';
 import '../../widgets/shared/empty_state.dart';
 import '../../services/api_service.dart';
 import '../../utils/format_utils.dart';
+import '../../utils/app_logger.dart';
 
 /// Mobile Notifications Screen - Shows user notifications with full API integration
 class NotificationsScreenMobile extends StatefulWidget {
@@ -52,7 +53,7 @@ class _NotificationsScreenMobileState extends State<NotificationsScreenMobile> {
         });
       }
     } catch (e) {
-      print('❌ Error loading notifications: $e');
+      AppLogger.debug('❌ Error loading notifications: $e');
       if (mounted) {
         setState(() {
           _error = 'Failed to load notifications';
@@ -82,7 +83,7 @@ class _NotificationsScreenMobileState extends State<NotificationsScreenMobile> {
       }
     });
     } catch (e) {
-      print('❌ Error marking notification as read: $e');
+      AppLogger.debug('❌ Error marking notification as read: $e');
     }
   }
 
@@ -108,7 +109,7 @@ class _NotificationsScreenMobileState extends State<NotificationsScreenMobile> {
         );
       }
     } catch (e) {
-      print('❌ Error marking all as read: $e');
+      AppLogger.debug('❌ Error marking all as read: $e');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -136,7 +137,7 @@ class _NotificationsScreenMobileState extends State<NotificationsScreenMobile> {
         _totalCount = _totalCount > 0 ? _totalCount - 1 : 0;
       });
     } catch (e) {
-      print('❌ Error deleting notification: $e');
+      AppLogger.debug('❌ Error deleting notification: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

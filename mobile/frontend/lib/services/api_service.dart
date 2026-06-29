@@ -10,6 +10,9 @@ import '../models/support_message.dart';
 import '../models/document_asset.dart';
 import '../config/environment.dart';
 import 'auth_service.dart';
+import '../utils/pinned_http_client.dart';
+import '../utils/app_logger.dart';
+import '../utils/api_error_utils.dart';
 
 /// API Service for connecting Flutter to backend
 /// 
@@ -24,6 +27,8 @@ import 'auth_service.dart';
 /// Production (--dart-define or .env):
 ///   flutter build apk --release --dart-define=API_BASE_URL=https://api.yourdomain.com/api/v1
 class ApiService {
+  static final _httpClient = PinnedHttpClient.instance;
+
   final AuthService _authService = AuthService();
   
   /// Callback for when session is truly expired (after refresh fails)
@@ -58,6 +63,24 @@ class ApiService {
     headers.addAll(authHeaders);
     return headers;
   }
+
+  Never _throwHttpFailure(String context, int statusCode, {String body = ''}) {
+    if (body.isNotEmpty) {
+      AppLogger.debug(
+        '$context: HTTP $statusCode ${ApiErrorUtils.sanitizeForLog(body)}',
+      );
+    } else {
+      AppLogger.debug('$context: HTTP $statusCode');
+    }
+    throw Exception(
+      ApiErrorUtils.sanitizeForUser('HTTP $statusCode', fallback: context),
+    );
+  }
+
+  Never _throwOperationError(String context, Object error) {
+    AppLogger.debug('$context: $error');
+    throw Exception(ApiErrorUtils.sanitizeForUser(error, fallback: context));
+  }
   
   /// Make an authenticated GET request with automatic token refresh on 401
   Future<http.Response> _authenticatedGet(
@@ -65,7 +88,7 @@ class ApiService {
     Duration timeout = const Duration(seconds: 10),
     bool allowRetry = true,
   }) async {
-    final response = await http.get(
+    final response = await _httpClient.get(
       uri,
       headers: await _getHeaders(),
     ).timeout(timeout);
@@ -78,7 +101,7 @@ class ApiService {
         return _authenticatedGet(uri, timeout: timeout, allowRetry: false);
       } else {
         // Refresh failed - session is truly expired
-        print('❌ Session expired - refresh token invalid');
+        AppLogger.debug('❌ Session expired - refresh token invalid');
         onSessionExpired?.call();
       }
     }
@@ -93,7 +116,7 @@ class ApiService {
     Duration timeout = const Duration(seconds: 10),
     bool allowRetry = true,
   }) async {
-    final response = await http.post(
+    final response = await _httpClient.post(
       uri,
       headers: await _getHeaders(),
       body: body,
@@ -107,7 +130,7 @@ class ApiService {
         return _authenticatedPost(uri, body: body, timeout: timeout, allowRetry: false);
       } else {
         // Refresh failed - session is truly expired
-        print('❌ Session expired - refresh token invalid');
+        AppLogger.debug('❌ Session expired - refresh token invalid');
         onSessionExpired?.call();
       }
     }
@@ -122,7 +145,7 @@ class ApiService {
     Duration timeout = const Duration(seconds: 10),
     bool allowRetry = true,
   }) async {
-    final response = await http.put(
+    final response = await _httpClient.put(
       uri,
       headers: await _getHeaders(),
       body: body,
@@ -136,7 +159,7 @@ class ApiService {
         return _authenticatedPut(uri, body: body, timeout: timeout, allowRetry: false);
       } else {
         // Refresh failed - session is truly expired
-        print('❌ Session expired - refresh token invalid');
+        AppLogger.debug('❌ Session expired - refresh token invalid');
         onSessionExpired?.call();
       }
     }
@@ -150,7 +173,7 @@ class ApiService {
     Duration timeout = const Duration(seconds: 10),
     bool allowRetry = true,
   }) async {
-    final response = await http.delete(
+    final response = await _httpClient.delete(
       uri,
       headers: await _getHeaders(),
     ).timeout(timeout);
@@ -163,7 +186,7 @@ class ApiService {
         return _authenticatedDelete(uri, timeout: timeout, allowRetry: false);
       } else {
         // Refresh failed - session is truly expired
-        print('❌ Session expired - refresh token invalid');
+        AppLogger.debug('❌ Session expired - refresh token invalid');
         onSessionExpired?.call();
       }
     }
@@ -186,7 +209,7 @@ class ApiService {
         'scheduled_start': scheduledStart?.toIso8601String(),
       }..removeWhere((k, v) => v == null);
 
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/live/streams'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -195,9 +218,9 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to create stream: HTTP ${response.statusCode} ${response.body}');
+      _throwHttpFailure('Failed to create stream', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Network error creating stream: $e');
+      _throwOperationError('Network error creating stream', e);
     }
   }
 
@@ -205,16 +228,16 @@ class ApiService {
   /// This triggers notifications to other users that the stream is live.
   Future<void> notifyHostJoined(int streamId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/live/streams/$streamId/host-joined'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode != 200 && response.statusCode != 201) {
-        print('Warning: Host joined notification failed: ${response.statusCode}');
+        AppLogger.debug('Warning: Host joined notification failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Warning: Failed to notify host joined: $e');
+      AppLogger.debug('Warning: Failed to notify host joined: $e');
     }
   }
 
@@ -222,20 +245,20 @@ class ApiService {
   /// This should be called when the host clicks "End Meeting for All".
   Future<void> endMeeting(int streamId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/live/streams/$streamId/end'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode != 200) {
         final errorBody = response.body;
-        print('Failed to end meeting: ${response.statusCode} - $errorBody');
-        throw Exception('Failed to end meeting: ${response.statusCode}');
+        AppLogger.debug('Failed to end meeting: ${response.statusCode} - $errorBody');
+        _throwHttpFailure('Failed to end meeting', response.statusCode, body: response.body);
       }
       
-      print('✅ Meeting ended successfully: $streamId');
+      AppLogger.debug('✅ Meeting ended successfully: $streamId');
     } catch (e) {
-      print('Error ending meeting: $e');
+      AppLogger.debug('Error ending meeting: $e');
       rethrow;
     }
   }
@@ -247,7 +270,7 @@ class ApiService {
       if (status != null) {
         uri = uri.replace(queryParameters: {'status': status});
       }
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -255,9 +278,9 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>();
       }
-      throw Exception('Failed to list streams: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to list streams', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Network error listing streams: $e');
+      _throwOperationError('Network error listing streams', e);
     }
   }
 
@@ -374,10 +397,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Podcast.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load podcasts: ${response.statusCode}');
+        _throwHttpFailure('Failed to load podcasts', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching podcasts: $e');
+      _throwOperationError('Error fetching podcasts', e);
     }
   }
   
@@ -398,7 +421,7 @@ class ApiService {
   /// Get single podcast
   Future<Podcast> getPodcast(int id) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/podcasts/$id'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -406,17 +429,17 @@ class ApiService {
       if (response.statusCode == 200) {
         return Podcast.fromJson(json.decode(response.body));
       } else {
-        throw Exception('Failed to load podcast: ${response.statusCode}');
+        _throwHttpFailure('Failed to load podcast', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching podcast: $e');
+      _throwOperationError('Error fetching podcast', e);
     }
   }
 
   /// Bulk create podcasts (admin only)
   Future<List<Map<String, dynamic>>> createBulkPodcasts(List<Map<String, dynamic>> podcasts) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/podcasts/bulk/'),
         headers: await _getHeaders(),
         body: json.encode(podcasts),
@@ -426,10 +449,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>();
       } else {
-        throw Exception('Failed to create podcasts: ${response.statusCode} - ${response.body}');
+        _throwHttpFailure('Failed to create podcasts', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error creating podcasts: $e');
+      _throwOperationError('Error creating podcasts', e);
     }
   }
 
@@ -455,7 +478,7 @@ class ApiService {
         });
       }
 
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -464,10 +487,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => MusicTrack.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load music tracks: ${response.statusCode}');
+        _throwHttpFailure('Failed to load music tracks', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching music tracks: $e');
+      _throwOperationError('Error fetching music tracks', e);
     }
   }
 
@@ -483,7 +506,7 @@ class ApiService {
           'limit': limit.toString(),
         },
       );
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -492,17 +515,17 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => BibleStory.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load bible stories: ${response.statusCode}');
+        _throwHttpFailure('Failed to load bible stories', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching bible stories: $e');
+      _throwOperationError('Error fetching bible stories', e);
     }
   }
 
   /// Get single music track
   Future<MusicTrack> getMusicTrack(int id) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/music/tracks/$id'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -510,10 +533,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return MusicTrack.fromJson(json.decode(response.body));
       } else {
-        throw Exception('Failed to load music track: ${response.statusCode}');
+        _throwHttpFailure('Failed to load music track', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching music track: $e');
+      _throwOperationError('Error fetching music track', e);
     }
   }
 
@@ -555,7 +578,7 @@ class ApiService {
         queryParams['post_type'] = postType;
       }
       
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri.replace(queryParameters: queryParams),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -564,10 +587,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data;
       } else {
-        throw Exception('Failed to load posts: ${response.statusCode}');
+        _throwHttpFailure('Failed to load posts', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching posts: $e');
+      _throwOperationError('Error fetching posts', e);
     }
   }
 
@@ -592,7 +615,7 @@ class ApiService {
         body['post_type'] = postType;
       }
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/community/posts'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -601,16 +624,16 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       }
-      throw Exception('Failed to create post: ${response.statusCode}');
+      _throwHttpFailure('Failed to create post', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error creating post: $e');
+      _throwOperationError('Error creating post', e);
     }
   }
 
   /// Like a post (toggles like/unlike)
   Future<Map<String, dynamic>?> likePost(int postId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/community/posts/$postId/like'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -621,7 +644,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('Error liking post: $e');
+      AppLogger.debug('Error liking post: $e');
       return null;
     }
   }
@@ -629,7 +652,7 @@ class ApiService {
   /// Get comments for a post
   Future<List<dynamic>> getPostComments(int postId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/community/posts/$postId/comments'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -638,16 +661,16 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data;
       }
-      throw Exception('Failed to get comments: ${response.statusCode}');
+      _throwHttpFailure('Failed to get comments', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching comments: $e');
+      _throwOperationError('Error fetching comments', e);
     }
   }
 
   /// Comment on a post
   Future<Map<String, dynamic>> commentPost(int postId, String comment) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/community/posts/$postId/comments'),
         headers: await _getHeaders(),
         body: json.encode({'content': comment}),
@@ -656,16 +679,16 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       }
-      throw Exception('Failed to comment: ${response.statusCode}');
+      _throwHttpFailure('Failed to comment', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error commenting: $e');
+      _throwOperationError('Error commenting', e);
     }
   }
 
   /// Get current user profile
   Future<Map<String, dynamic>> getCurrentUser() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/users/me'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -673,9 +696,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to get user: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to get user', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching user: $e');
+      _throwOperationError('Error fetching user', e);
     }
   }
 
@@ -715,7 +738,7 @@ class ApiService {
         );
       }
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -727,11 +750,9 @@ class ApiService {
           'filename': data['filename'],
         };
       }
-      throw Exception(
-        'Failed to upload image: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload image', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading image: $e');
+      _throwOperationError('Error uploading image', e);
     }
   }
 
@@ -767,7 +788,7 @@ class ApiService {
       request.headers.addAll(await _getHeaders());
 
       final streamedResponse =
-          await request.send().timeout(const Duration(minutes: 2));
+          await _httpClient.send(request).timeout(const Duration(minutes: 2));
 
       if (streamedResponse.statusCode == 200 ||
           streamedResponse.statusCode == 201) {
@@ -776,11 +797,9 @@ class ApiService {
         return data['url'] as String? ?? '';
       }
 
-      throw Exception(
-        'Failed to upload profile image: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload profile image', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading profile image: $e');
+      _throwOperationError('Error uploading profile image', e);
     }
   }
 
@@ -798,7 +817,7 @@ class ApiService {
       request.headers.addAll(await _getHeaders());
 
       final streamedResponse =
-          await request.send().timeout(const Duration(minutes: 5));
+          await _httpClient.send(request).timeout(const Duration(minutes: 5));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -806,11 +825,9 @@ class ApiService {
         return data['url'] as String? ?? data['file_path'] as String? ?? '';
       }
 
-      throw Exception(
-        'Failed to upload draft audio: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload draft audio', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading draft audio: $e');
+      _throwOperationError('Error uploading draft audio', e);
     }
   }
 
@@ -828,7 +845,7 @@ class ApiService {
       request.headers.addAll(await _getHeaders());
 
       final streamedResponse =
-          await request.send().timeout(const Duration(minutes: 10));
+          await _httpClient.send(request).timeout(const Duration(minutes: 10));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -836,11 +853,9 @@ class ApiService {
         return data['url'] as String? ?? data['file_path'] as String? ?? '';
       }
 
-      throw Exception(
-        'Failed to upload draft video: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload draft video', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading draft video: $e');
+      _throwOperationError('Error uploading draft video', e);
     }
   }
 
@@ -858,7 +873,7 @@ class ApiService {
       request.headers.addAll(await _getHeaders());
 
       final streamedResponse =
-          await request.send().timeout(const Duration(seconds: 30));
+          await _httpClient.send(request).timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -866,18 +881,16 @@ class ApiService {
         return data['url'] as String? ?? data['file_path'] as String? ?? '';
       }
 
-      throw Exception(
-        'Failed to upload draft image: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload draft image', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading draft image: $e');
+      _throwOperationError('Error uploading draft image', e);
     }
   }
 
   /// Get support stats for the current user/admin
   Future<SupportStats> getSupportStats() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/support/messages/stats'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -887,17 +900,15 @@ class ApiService {
           json.decode(response.body) as Map<String, dynamic>,
         );
       }
-      throw Exception(
-        'Failed to load support stats: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to load support stats', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching support stats: $e');
+      _throwOperationError('Error fetching support stats', e);
     }
   }
 
   Future<List<SupportMessage>> getMySupportMessages() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/support/messages/me'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -908,11 +919,9 @@ class ApiService {
             .map((item) => SupportMessage.fromJson(item))
             .toList(growable: false);
       }
-      throw Exception(
-        'Failed to load support messages: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to load support messages', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error loading support messages: $e');
+      _throwOperationError('Error loading support messages', e);
     }
   }
 
@@ -923,7 +932,7 @@ class ApiService {
         uri = uri.replace(queryParameters: {'status_filter': status});
       }
 
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -934,11 +943,9 @@ class ApiService {
             .map((item) => SupportMessage.fromJson(item))
             .toList(growable: false);
       }
-      throw Exception(
-        'Failed to load admin support messages: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to load admin support messages', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error loading admin support messages: $e');
+      _throwOperationError('Error loading admin support messages', e);
     }
   }
 
@@ -947,7 +954,7 @@ class ApiService {
     required String message,
   }) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/support/messages'),
         headers: await _getHeaders(),
         body: json.encode({
@@ -961,11 +968,9 @@ class ApiService {
           json.decode(response.body) as Map<String, dynamic>,
         );
       }
-      throw Exception(
-        'Failed to send support message: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to send support message', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error sending support message: $e');
+      _throwOperationError('Error sending support message', e);
     }
   }
 
@@ -975,7 +980,7 @@ class ApiService {
     String status = 'responded',
   }) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/support/messages/$messageId/reply'),
         headers: await _getHeaders(),
         body: json.encode({
@@ -989,11 +994,9 @@ class ApiService {
           json.decode(response.body) as Map<String, dynamic>,
         );
       }
-      throw Exception(
-        'Failed to reply to message: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to reply to message', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error replying to support message: $e');
+      _throwOperationError('Error replying to support message', e);
     }
   }
 
@@ -1002,7 +1005,7 @@ class ApiService {
     required String actor,
   }) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/support/messages/$messageId/mark-read'),
         headers: await _getHeaders(),
         body: json.encode({'actor': actor}),
@@ -1013,11 +1016,9 @@ class ApiService {
           json.decode(response.body) as Map<String, dynamic>,
         );
       }
-      throw Exception(
-        'Failed to update message read state: HTTP ${response.statusCode}',
-      );
+      _throwHttpFailure('Failed to update message read state', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error updating support message: $e');
+      _throwOperationError('Error updating support message', e);
     }
   }
 
@@ -1027,7 +1028,7 @@ class ApiService {
       if (category != null && category.isNotEmpty) {
         uri = uri.replace(queryParameters: {'category': category});
       }
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1036,9 +1037,9 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((e) => DocumentAsset.fromJson(e)).toList();
       }
-      throw Exception('Failed to load documents: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to load documents', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching documents: $e');
+      _throwOperationError('Error fetching documents', e);
     }
   }
 
@@ -1051,7 +1052,7 @@ class ApiService {
     bool isFeatured = false,
   }) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/documents/'),
         headers: await _getHeaders(),
         body: json.encode({
@@ -1069,24 +1070,24 @@ class ApiService {
           json.decode(response.body) as Map<String, dynamic>,
         );
       }
-      throw Exception('Failed to create document: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to create document', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error creating document: $e');
+      _throwOperationError('Error creating document', e);
     }
   }
 
   Future<void> deleteDocument(int documentId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/documents/$documentId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception('Failed to delete document: HTTP ${response.statusCode}');
+        _throwHttpFailure('Failed to delete document', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error deleting document: $e');
+      _throwOperationError('Error deleting document', e);
     }
   }
 
@@ -1121,7 +1122,7 @@ class ApiService {
       request.headers.addAll(await _getHeaders());
 
       final streamedResponse =
-          await request.send().timeout(const Duration(minutes: 2));
+          await _httpClient.send(request).timeout(const Duration(minutes: 2));
 
       if (streamedResponse.statusCode == 200 ||
           streamedResponse.statusCode == 201) {
@@ -1130,18 +1131,16 @@ class ApiService {
         return data['url'] as String? ?? '';
       }
 
-      throw Exception(
-        'Failed to upload document: HTTP ${streamedResponse.statusCode}',
-      );
+      _throwHttpFailure('Failed to upload document', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading document: $e');
+      _throwOperationError('Error uploading document', e);
     }
   }
 
   /// Get user stats (total listening time, tracks played, etc.)
   Future<Map<String, dynamic>?> updateProfile(Map<String, dynamic> profileData) async {
     try {
-      final response = await http.put(
+      final response = await _httpClient.put(
         Uri.parse('$baseUrl/users/me'),
         headers: await _getHeaders(),
         body: jsonEncode(profileData),
@@ -1150,15 +1149,15 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to update profile: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to update profile', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error updating profile: $e');
+      _throwOperationError('Error updating profile', e);
     }
   }
   
   Future<Map<String, dynamic>?> getBankDetails() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/bank-details'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1168,15 +1167,15 @@ class ApiService {
       } else if (response.statusCode == 404) {
         return null; // No bank details found
       }
-      throw Exception('Failed to get bank details: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to get bank details', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting bank details: $e');
+      _throwOperationError('Error getting bank details', e);
     }
   }
   
   Future<bool> updateBankDetails(Map<String, dynamic> bankData) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/bank-details'),
         headers: await _getHeaders(),
         body: jsonEncode(bankData),
@@ -1184,13 +1183,13 @@ class ApiService {
       
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error updating bank details: $e');
+      _throwOperationError('Error updating bank details', e);
     }
   }
   
   Future<Map<String, dynamic>> checkUsernameAvailability(String username) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/auth/check-username'),
         headers: await _getHeaders(),
         body: jsonEncode({'username': username}),
@@ -1199,9 +1198,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to check username: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to check username', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error checking username: $e');
+      _throwOperationError('Error checking username', e);
     }
   }
   
@@ -1225,7 +1224,7 @@ class ApiService {
   /// Get public user profile by user ID
   Future<Map<String, dynamic>?> getPublicUserProfile(int userId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/users/$userId/public'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -1235,7 +1234,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('Error fetching public user profile: $e');
+      AppLogger.debug('Error fetching public user profile: $e');
       return null;
     }
   }
@@ -1243,7 +1242,7 @@ class ApiService {
   /// Get all playlists
   Future<List<dynamic>> getPlaylists() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/playlists/'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -1254,7 +1253,7 @@ class ApiService {
       }
       return [];
     } catch (e) {
-      print('Error fetching playlists: $e');
+      AppLogger.debug('Error fetching playlists: $e');
     return [];
     }
   }
@@ -1265,7 +1264,7 @@ class ApiService {
     String? description,
   }) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/playlists/'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -1277,16 +1276,16 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       }
-      throw Exception('Failed to create playlist: ${response.statusCode}');
+      _throwHttpFailure('Failed to create playlist', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error creating playlist: $e');
+      _throwOperationError('Error creating playlist', e);
     }
   }
 
   /// Add item to playlist
   Future<bool> addToPlaylist(int playlistId, String contentType, int contentId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/playlists/$playlistId/items'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -1297,7 +1296,7 @@ class ApiService {
       
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Error adding to playlist: $e');
+      AppLogger.debug('Error adding to playlist: $e');
       return false;
     }
   }
@@ -1311,7 +1310,7 @@ class ApiService {
       }
 
       final uri = Uri.parse('$baseUrl/favorites').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1320,10 +1319,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>();
       }
-      print('Failed to get favorites: ${response.statusCode}');
+      AppLogger.debug('Failed to get favorites: ${response.statusCode}');
       return [];
     } catch (e) {
-      print('Error getting favorites: $e');
+      AppLogger.debug('Error getting favorites: $e');
       return [];
     }
   }
@@ -1331,7 +1330,7 @@ class ApiService {
   /// Add to favorites
   Future<bool> addToFavorites(String contentType, int contentId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/favorites'),
         headers: await _getHeaders(),
         body: json.encode({
@@ -1343,12 +1342,12 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
       }
-      print('Failed to add to favorites: ${response.statusCode}');
-      print('Response body: ${response.body}');
-      print('Request body: content_type=$contentType, content_id=$contentId');
+      AppLogger.debug('Failed to add to favorites: ${response.statusCode}');
+      AppLogger.debug('Response body: ${response.body}');
+      AppLogger.debug('Request body: content_type=$contentType, content_id=$contentId');
       return false;
     } catch (e) {
-      print('Error adding to favorites: $e');
+      AppLogger.debug('Error adding to favorites: $e');
       return false;
     }
   }
@@ -1356,7 +1355,7 @@ class ApiService {
   /// Remove from favorites
   Future<bool> removeFromFavorites(String contentType, int contentId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/favorites/$contentType/$contentId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1364,10 +1363,10 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
       }
-      print('Failed to remove from favorites: ${response.statusCode}');
+      AppLogger.debug('Failed to remove from favorites: ${response.statusCode}');
       return false;
     } catch (e) {
-      print('Error removing from favorites: $e');
+      AppLogger.debug('Error removing from favorites: $e');
       return false;
     }
   }
@@ -1375,7 +1374,7 @@ class ApiService {
   /// Check if an item is favorited
   Future<bool> isFavorited(String contentType, int contentId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/favorites/check/$contentType/$contentId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1386,7 +1385,7 @@ class ApiService {
       }
       return false;
     } catch (e) {
-      print('Error checking favorite status: $e');
+      AppLogger.debug('Error checking favorite status: $e');
       return false;
     }
   }
@@ -1409,7 +1408,7 @@ class ApiService {
       }
 
       final uri = Uri.parse('$baseUrl/drafts/').replace(queryParameters: queryParams);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1417,10 +1416,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      print('Failed to get drafts: ${response.statusCode}');
+      AppLogger.debug('Failed to get drafts: ${response.statusCode}');
       return {'drafts': [], 'total': 0};
     } catch (e) {
-      print('Error getting drafts: $e');
+      AppLogger.debug('Error getting drafts: $e');
       return {'drafts': [], 'total': 0};
     }
   }
@@ -1428,7 +1427,7 @@ class ApiService {
   /// Create a new content draft
   Future<Map<String, dynamic>?> createDraft(Map<String, dynamic> draftData) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/drafts/'),
         headers: await _getHeaders(),
         body: json.encode(draftData),
@@ -1437,10 +1436,10 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      print('Failed to create draft: ${response.statusCode} - ${response.body}');
+      AppLogger.debug('Failed to create draft: ${response.statusCode} - ${response.body}');
       return null;
     } catch (e) {
-      print('Error creating draft: $e');
+      AppLogger.debug('Error creating draft: $e');
       return null;
     }
   }
@@ -1448,7 +1447,7 @@ class ApiService {
   /// Update an existing content draft
   Future<Map<String, dynamic>?> updateDraft(int draftId, Map<String, dynamic> draftData) async {
     try {
-      final response = await http.put(
+      final response = await _httpClient.put(
         Uri.parse('$baseUrl/drafts/$draftId'),
         headers: await _getHeaders(),
         body: json.encode(draftData),
@@ -1457,10 +1456,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      print('Failed to update draft: ${response.statusCode}');
+      AppLogger.debug('Failed to update draft: ${response.statusCode}');
       return null;
     } catch (e) {
-      print('Error updating draft: $e');
+      AppLogger.debug('Error updating draft: $e');
       return null;
     }
   }
@@ -1468,14 +1467,14 @@ class ApiService {
   /// Delete a content draft
   Future<bool> deleteDraft(int draftId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/drafts/$draftId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error deleting draft: $e');
+      AppLogger.debug('Error deleting draft: $e');
       return false;
     }
   }
@@ -1483,7 +1482,7 @@ class ApiService {
   /// Get a specific draft by ID
   Future<Map<String, dynamic>?> getDraft(int draftId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/drafts/$draftId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -1491,10 +1490,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      print('Failed to get draft: ${response.statusCode}');
+      AppLogger.debug('Failed to get draft: ${response.statusCode}');
       return null;
     } catch (e) {
-      print('Error getting draft: $e');
+      AppLogger.debug('Error getting draft: $e');
       return null;
     }
   }
@@ -1519,7 +1518,7 @@ class ApiService {
         queryParams['type'] = type.toLowerCase();
       }
       
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri.replace(queryParameters: queryParams),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -1548,16 +1547,16 @@ class ApiService {
       request.files.add(file);
       request.headers.addAll(await _getHeaders());
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 5));
       
       if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
         final response = await http.Response.fromStream(streamedResponse);
         final data = json.decode(response.body);
         return data['url'] ?? data['path'] ?? '';
       }
-      throw Exception('Failed to upload file: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to upload file', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading file: $e');
+      _throwOperationError('Error uploading file', e);
     }
   }
 
@@ -1575,7 +1574,7 @@ class ApiService {
       }
       
       final fileSize = await fileToUpload.length();
-      print('📤 Uploading file: $filePath (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+      AppLogger.debug('📤 Uploading file: $filePath (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
       
       // Determine content type based on file type
       String? contentType;
@@ -1596,7 +1595,7 @@ class ApiService {
       request.files.add(file);
       request.headers.addAll(await _getHeaders());
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
         final response = await http.Response.fromStream(streamedResponse);
@@ -1622,11 +1621,9 @@ class ApiService {
         errorMessage += ': ${errorResponse.body}';
       }
       
-      print('❌ Upload failed: $errorMessage');
-      throw Exception('Failed to upload file: $errorMessage');
+      _throwOperationError('Failed to upload file', errorMessage);
     } catch (e) {
-      print('❌ Upload error: $e');
-      throw Exception('Error uploading file: $e');
+      _throwOperationError('Error uploading file', e);
     }
   }
 
@@ -1653,7 +1650,7 @@ class ApiService {
         'thumbnail_timestamp': thumbnailTimestamp ?? 30, // Default to 30 seconds
       }..removeWhere((k, v) => v == null);
 
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/podcasts/'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -1662,9 +1659,9 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to create podcast: HTTP ${response.statusCode} - ${response.body}');
+      _throwHttpFailure('Failed to create podcast', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error creating podcast: $e');
+      _throwOperationError('Error creating podcast', e);
     }
   }
 
@@ -1678,7 +1675,7 @@ class ApiService {
       final fullUrl = getMediaUrl(url);
       final uri = Uri.parse(fullUrl);
       final request = http.Request('GET', uri);
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 5));
       
       if (streamedResponse.statusCode == 200) {
         final file = await http.Response.fromStream(streamedResponse);
@@ -1686,9 +1683,9 @@ class ApiService {
         // This is a simplified version - in production you'd write to FileSystem
         return savePath;
       }
-      throw Exception('Failed to download file: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to download file', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error downloading file: $e');
+      _throwOperationError('Error downloading file', e);
     }
   }
 
@@ -1706,23 +1703,23 @@ class ApiService {
         throw Exception('End time must be greater than start time');
       }
       
-      print('🎬 Trimming video: $videoPath');
-      print('   Start: $startTime seconds, End: $endTime seconds');
+      AppLogger.debug('🎬 Trimming video: $videoPath');
+      AppLogger.debug('   Start: $startTime seconds, End: $endTime seconds');
       
       // Check if videoPath is a network URL and download it first
       String localPath = videoPath;
       if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
-        print('   Video is a network URL, downloading first...');
+        AppLogger.debug('   Video is a network URL, downloading first...');
         // Download to temp directory
         final tempDir = await getTemporaryDirectory();
         final fileName = 'temp_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
         localPath = '${tempDir.path}/$fileName';
         
-        final response = await http.get(Uri.parse(videoPath));
+        final response = await _httpClient.get(Uri.parse(videoPath));
         if (response.statusCode == 200) {
           final file = File(localPath);
           await file.writeAsBytes(response.bodyBytes);
-          print('   Downloaded to: $localPath');
+          AppLogger.debug('   Downloaded to: $localPath');
         } else {
           throw Exception('Failed to download video for editing');
         }
@@ -1740,22 +1737,22 @@ class ApiService {
       request.fields['start_time'] = startTime.toString();
       request.fields['end_time'] = endTime.toString();
       
-      print('   Sending trim request to backend...');
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      AppLogger.debug('   Sending trim request to backend...');
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         final result = json.decode(response.body);
-        print('   ✅ Trim successful: $result');
+        AppLogger.debug('   ✅ Trim successful: $result');
         return result;
       }
       
       final errorBody = await http.Response.fromStream(streamedResponse);
-      print('   ❌ Trim failed: ${streamedResponse.statusCode} - ${errorBody.body}');
-      throw Exception('Failed to trim video: HTTP ${streamedResponse.statusCode}');
+      AppLogger.debug('   ❌ Trim failed: ${streamedResponse.statusCode} - ${errorBody.body}');
+      _throwHttpFailure('Failed to trim video', streamedResponse.statusCode);
     } catch (e) {
-      print('   ❌ Error trimming video: $e');
-      throw Exception('Error trimming video: $e');
+      AppLogger.debug('   ❌ Error trimming video: $e');
+      _throwOperationError('Error trimming video', e);
     }
   }
 
@@ -1765,15 +1762,15 @@ class ApiService {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/video-editing/remove-audio'));
       request.files.add(file);
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to remove audio: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to remove audio', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error removing audio: $e');
+      _throwOperationError('Error removing audio', e);
     }
   }
 
@@ -1785,15 +1782,15 @@ class ApiService {
       request.files.add(videoFile);
       request.files.add(audioFile);
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to add audio: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to add audio', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error adding audio: $e');
+      _throwOperationError('Error adding audio', e);
     }
   }
 
@@ -1811,15 +1808,15 @@ class ApiService {
       if (contrast != null) request.fields['contrast'] = contrast.toString();
       if (saturation != null) request.fields['saturation'] = saturation.toString();
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to apply filters: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to apply filters', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error applying filters: $e');
+      _throwOperationError('Error applying filters', e);
     }
   }
 
@@ -1830,21 +1827,21 @@ class ApiService {
         throw Exception('Invalid rotation degrees. Must be 90, 180, or 270');
       }
       
-      print('🔄 Rotating video: $videoPath by $degrees degrees');
+      AppLogger.debug('🔄 Rotating video: $videoPath by $degrees degrees');
       
       // Check if videoPath is a network URL and download it first
       String localPath = videoPath;
       if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
-        print('   Video is a network URL, downloading first...');
+        AppLogger.debug('   Video is a network URL, downloading first...');
         final tempDir = await getTemporaryDirectory();
         final fileName = 'temp_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
         localPath = '${tempDir.path}/$fileName';
         
-        final response = await http.get(Uri.parse(videoPath));
+        final response = await _httpClient.get(Uri.parse(videoPath));
         if (response.statusCode == 200) {
           final file = File(localPath);
           await file.writeAsBytes(response.bodyBytes);
-          print('   Downloaded to: $localPath');
+          AppLogger.debug('   Downloaded to: $localPath');
         } else {
           throw Exception('Failed to download video for editing');
         }
@@ -1861,22 +1858,22 @@ class ApiService {
       request.files.add(file);
       request.fields['degrees'] = degrees.toString();
       
-      print('   Sending rotate request to backend...');
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      AppLogger.debug('   Sending rotate request to backend...');
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         final result = json.decode(response.body);
-        print('   ✅ Rotate successful: $result');
+        AppLogger.debug('   ✅ Rotate successful: $result');
         return result;
       }
       
       final errorBody = await http.Response.fromStream(streamedResponse);
-      print('   ❌ Rotate failed: ${streamedResponse.statusCode} - ${errorBody.body}');
-      throw Exception('Failed to rotate video: HTTP ${streamedResponse.statusCode}');
+      AppLogger.debug('   ❌ Rotate failed: ${streamedResponse.statusCode} - ${errorBody.body}');
+      _throwHttpFailure('Failed to rotate video', streamedResponse.statusCode);
     } catch (e) {
-      print('   ❌ Error rotating video: $e');
-      throw Exception('Error rotating video: $e');
+      AppLogger.debug('   ❌ Error rotating video: $e');
+      _throwOperationError('Error rotating video', e);
     }
   }
 
@@ -1893,15 +1890,15 @@ class ApiService {
       request.fields['start_time'] = startTime.toString();
       request.fields['end_time'] = endTime.toString();
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to trim audio: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to trim audio', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error trimming audio: $e');
+      _throwOperationError('Error trimming audio', e);
     }
   }
 
@@ -1914,15 +1911,15 @@ class ApiService {
         request.files.add(file);
       }
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to merge audio: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to merge audio', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error merging audio: $e');
+      _throwOperationError('Error merging audio', e);
     }
   }
 
@@ -1933,15 +1930,15 @@ class ApiService {
       request.files.add(file);
       request.fields['fade_duration'] = fadeDuration.toString();
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to apply fade in: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to apply fade in', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error applying fade in: $e');
+      _throwOperationError('Error applying fade in', e);
     }
   }
 
@@ -1952,15 +1949,15 @@ class ApiService {
       request.files.add(file);
       request.fields['fade_duration'] = fadeDuration.toString();
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to apply fade out: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to apply fade out', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error applying fade out: $e');
+      _throwOperationError('Error applying fade out', e);
     }
   }
 
@@ -1976,15 +1973,15 @@ class ApiService {
       request.fields['fade_in_duration'] = fadeInDuration.toString();
       request.fields['fade_out_duration'] = fadeOutDuration.toString();
       
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 10));
       
       if (streamedResponse.statusCode == 200) {
         final response = await http.Response.fromStream(streamedResponse);
         return json.decode(response.body);
       }
-      throw Exception('Failed to apply fade in/out: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to apply fade in/out', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error applying fade in/out: $e');
+      _throwOperationError('Error applying fade in/out', e);
     }
   }
 
@@ -2006,7 +2003,7 @@ class ApiService {
       if (status != null) queryParams['status'] = status;
 
       final uri = Uri.parse('$baseUrl/movies/').replace(queryParameters: queryParams);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -2015,17 +2012,17 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Movie.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load movies: ${response.statusCode}');
+        _throwHttpFailure('Failed to load movies', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching movies: $e');
+      _throwOperationError('Error fetching movies', e);
     }
   }
 
   /// Get single movie
   Future<Movie> getMovie(int id) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/movies/$id'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -2033,17 +2030,17 @@ class ApiService {
       if (response.statusCode == 200) {
         return Movie.fromJson(json.decode(response.body));
       } else {
-        throw Exception('Failed to load movie: ${response.statusCode}');
+        _throwHttpFailure('Failed to load movie', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching movie: $e');
+      _throwOperationError('Error fetching movie', e);
     }
   }
 
   /// Get featured movies for hero carousel
   Future<List<Movie>> getFeaturedMovies({int limit = 10}) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/movies/featured/?limit=$limit'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -2052,17 +2049,17 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Movie.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load featured movies: ${response.statusCode}');
+        _throwHttpFailure('Failed to load featured movies', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching featured movies: $e');
+      _throwOperationError('Error fetching featured movies', e);
     }
   }
 
   /// Get animated Bible stories
   Future<List<Movie>> getAnimatedBibleStories({int limit = 20}) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/movies/animated-bible-stories/?limit=$limit'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -2071,17 +2068,17 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Movie.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load animated Bible stories: ${response.statusCode}');
+        _throwHttpFailure('Failed to load animated Bible stories', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching animated Bible stories: $e');
+      _throwOperationError('Error fetching animated Bible stories', e);
     }
   }
 
   /// Get similar movies
   Future<List<Movie>> getSimilarMovies(int movieId, {int limit = 10}) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/movies/$movieId/similar?limit=$limit'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
@@ -2090,10 +2087,10 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Movie.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load similar movies: ${response.statusCode}');
+        _throwHttpFailure('Failed to load similar movies', response.statusCode, body: response.body);
       }
     } catch (e) {
-      throw Exception('Error fetching similar movies: $e');
+      _throwOperationError('Error fetching similar movies', e);
     }
   }
 
@@ -2142,17 +2139,17 @@ class ApiService {
   Future<Map<String, dynamic>> getAdminDashboard() async {
     try {
       final headers = await _getHeaders();
-      print('🔐 Admin Dashboard Request Headers: ${headers.keys.toList()}');
-      print('🔐 Authorization header present: ${headers.containsKey('Authorization')}');
+      AppLogger.debug('🔐 Admin Dashboard Request Headers: ${headers.keys.toList()}');
+      AppLogger.debug('🔐 Authorization header present: ${headers.containsKey('Authorization')}');
       
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/admin/dashboard'),
         headers: headers,
       ).timeout(const Duration(seconds: 10));
       
-      print('📡 Admin Dashboard Response Status: ${response.statusCode}');
+      AppLogger.debug('📡 Admin Dashboard Response Status: ${response.statusCode}');
       if (response.statusCode != 200) {
-        print('❌ Admin Dashboard Error Response: ${response.body}');
+        AppLogger.debug('❌ Admin Dashboard Error Response: ${response.body}');
       }
       
       if (response.statusCode == 200) {
@@ -2162,16 +2159,16 @@ class ApiService {
       } else if (response.statusCode == 403) {
         throw Exception('Forbidden: Admin access required.');
       }
-      throw Exception('Failed to get admin dashboard: ${response.statusCode} - ${response.body}');
+      _throwHttpFailure('Failed to get admin dashboard', response.statusCode, body: response.body);
     } catch (e) {
-      print('💥 Admin Dashboard Exception: $e');
-      throw Exception('Error fetching admin dashboard: $e');
+      AppLogger.debug('💥 Admin Dashboard Exception: $e');
+      _throwOperationError('Error fetching admin dashboard', e);
     }
   }
   
   Future<List<dynamic>> getPendingContent() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/admin/pending'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2180,28 +2177,28 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data;
       }
-      throw Exception('Failed to get pending content: ${response.statusCode}');
+      _throwHttpFailure('Failed to get pending content', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching pending content: $e');
+      _throwOperationError('Error fetching pending content', e);
     }
   }
   
   Future<bool> approveContent(String contentType, int contentId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/admin/approve/$contentType/$contentId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error approving content: $e');
+      _throwOperationError('Error approving content', e);
     }
   }
   
   Future<bool> rejectContent(String contentType, int contentId, {String? reason}) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/admin/reject/$contentType/$contentId'),
         headers: await _getHeaders(),
         body: json.encode({'reason': reason}),
@@ -2209,7 +2206,7 @@ class ApiService {
       
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error rejecting content: $e');
+      _throwOperationError('Error rejecting content', e);
     }
   }
   
@@ -2228,7 +2225,7 @@ class ApiService {
       if (status != null) queryParams['status'] = status;
       
       final uri = Uri.parse('$baseUrl/admin/content').replace(queryParameters: queryParams);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2237,16 +2234,16 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data;
       }
-      throw Exception('Failed to get content: ${response.statusCode}');
+      _throwHttpFailure('Failed to get content', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching content: $e');
+      _throwOperationError('Error fetching content', e);
     }
   }
   
   /// Google Drive API Methods
   Future<String> getGoogleDriveAuthUrl() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/admin/google-drive/auth-url'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2259,16 +2256,16 @@ class ApiService {
         final errorData = json.decode(response.body);
         throw Exception('Google Drive not configured: ${errorData['detail']?['message'] ?? 'Setup required'}');
       }
-      throw Exception('Failed to get auth URL: ${response.statusCode} ${response.body}');
+      _throwHttpFailure('Failed to get auth URL', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting Google Drive auth URL: $e');
+      _throwOperationError('Error getting Google Drive auth URL', e);
     }
   }
 
   /// Get Google OAuth Client ID for frontend
   Future<String?> getGoogleClientId() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/auth/google-client-id'),
       ).timeout(const Duration(seconds: 5));
       
@@ -2278,7 +2275,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('⚠️  Could not fetch Google Client ID from backend: $e');
+      AppLogger.debug('⚠️  Could not fetch Google Client ID from backend: $e');
       return null;
     }
   }
@@ -2286,7 +2283,7 @@ class ApiService {
   /// Get OAuth token for Google Picker API
   Future<Map<String, dynamic>> getGoogleDrivePickerToken() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/admin/google-drive/picker-token'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2294,9 +2291,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to get picker token: ${response.statusCode}');
+      _throwHttpFailure('Failed to get picker token', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting Google Drive picker token: $e');
+      _throwOperationError('Error getting Google Drive picker token', e);
     }
   }
   
@@ -2306,7 +2303,7 @@ class ApiService {
       if (mimeType != null) queryParams['mime_type'] = mimeType;
       
       final uri = Uri.parse('$baseUrl/admin/google-drive/files').replace(queryParameters: queryParams);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2315,15 +2312,15 @@ class ApiService {
         final data = json.decode(response.body);
         return data['files'] as List<dynamic>;
       }
-      throw Exception('Failed to list files: ${response.statusCode}');
+      _throwHttpFailure('Failed to list files', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error listing Google Drive files: $e');
+      _throwOperationError('Error listing Google Drive files', e);
     }
   }
   
   Future<Map<String, dynamic>> importGoogleDriveFile(String fileId, String fileType) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/admin/google-drive/import/$fileId?file_type=$fileType'),
         headers: await _getHeaders(),
       ).timeout(const Duration(minutes: 5));
@@ -2331,9 +2328,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to import file: ${response.statusCode}');
+      _throwHttpFailure('Failed to import file', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error importing file: $e');
+      _throwOperationError('Error importing file', e);
     }
   }
 
@@ -2347,7 +2344,7 @@ class ApiService {
   /// Get LiveKit access token for voice agent
   Future<Map<String, dynamic>> getLiveKitVoiceToken(String roomName, {String? userIdentity}) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/livekit/voice/token'),
         headers: await _getHeaders(),
         body: jsonEncode({
@@ -2359,9 +2356,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to get token: HTTP ${response.statusCode} ${response.body}');
+      _throwHttpFailure('Failed to get token', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting LiveKit token: $e');
+      _throwOperationError('Error getting LiveKit token', e);
     }
   }
   
@@ -2369,10 +2366,10 @@ class ApiService {
   Future<Map<String, dynamic>> createLiveKitRoom(String roomName, {int maxParticipants = 10}) async {
     try {
       final url = '$baseUrl/livekit/voice/room';
-      print('🌐 Creating LiveKit room: POST $url');
-      print('🌐 Room name: $roomName, max participants: $maxParticipants');
+      AppLogger.debug('🌐 Creating LiveKit room: POST $url');
+      AppLogger.debug('🌐 Room name: $roomName, max participants: $maxParticipants');
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse(url),
         headers: await _getHeaders(),
         body: jsonEncode({
@@ -2386,37 +2383,40 @@ class ApiService {
         },
       );
       
-      print('🌐 Response status: ${response.statusCode}');
-      print('🌐 Response body: ${response.body}');
+      AppLogger.debug('🌐 Response status: ${response.statusCode}');
+      AppLogger.debug('🌐 Response body: ${response.body}');
       
       if (response.statusCode == 200) {
         final result = json.decode(response.body) as Map<String, dynamic>;
-        print('✅ Room created successfully: $result');
+        AppLogger.debug('✅ Room created successfully: $result');
         return result;
       } else if (response.statusCode == 500) {
         // Try to parse error message from response
         try {
           final errorBody = json.decode(response.body) as Map<String, dynamic>;
           final detail = errorBody['detail'] ?? errorBody['message'] ?? response.body;
-          throw Exception('Backend error: $detail');
+          _throwOperationError('Backend error', detail);
         } catch (_) {
-          throw Exception('Failed to create room: HTTP ${response.statusCode}. ${response.body}');
+          _throwHttpFailure('Failed to create room', response.statusCode, body: response.body);
         }
       } else {
-        throw Exception('Failed to create room: HTTP ${response.statusCode}. ${response.body}');
+        _throwHttpFailure('Failed to create room', response.statusCode, body: response.body);
       }
     } on TimeoutException catch (e) {
-      print('❌ Timeout creating room: $e');
+      AppLogger.debug('❌ Timeout creating room: $e');
       rethrow;
     } on http.ClientException catch (e) {
-      print('❌ Network error creating room: $e');
-      throw Exception('Network error: Cannot connect to backend at $baseUrl. Please ensure the backend server is running.');
+      AppLogger.debug('❌ Network error creating room: $e');
+      _throwOperationError(
+        'Network error creating room',
+        e,
+      );
     } catch (e) {
-      print('❌ Error creating LiveKit room: $e');
+      AppLogger.debug('❌ Error creating LiveKit room: $e');
       if (e is Exception) {
         rethrow;
       }
-      throw Exception('Error creating LiveKit room: $e');
+      _throwOperationError('Error creating LiveKit room', e);
     }
   }
 
@@ -2438,7 +2438,7 @@ class ApiService {
         body['email'] = userEmail;
       }
 
-      final response = await http.post(
+      final response = await _httpClient.post(
         url,
         headers: await _getHeaders(),
         body: jsonEncode(body),
@@ -2447,9 +2447,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to get LiveKit meeting token: HTTP ${response.statusCode} ${response.body}');
+      _throwHttpFailure('Failed to get LiveKit meeting token', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting LiveKit meeting token: $e');
+      _throwOperationError('Error getting LiveKit meeting token', e);
     }
   }
 
@@ -2471,7 +2471,7 @@ class ApiService {
         body['email'] = userEmail;
       }
 
-      final response = await http.post(
+      final response = await _httpClient.post(
         url,
         headers: await _getHeaders(),
         body: jsonEncode(body),
@@ -2480,9 +2480,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to get LiveKit meeting token by room: HTTP ${response.statusCode} ${response.body}');
+      _throwHttpFailure('Failed to get LiveKit meeting token by room', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting LiveKit meeting token by room: $e');
+      _throwOperationError('Error getting LiveKit meeting token by room', e);
     }
   }
 
@@ -2539,7 +2539,7 @@ class ApiService {
       
       final uri = Uri.parse('$baseUrl/artists').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 15));
@@ -2548,9 +2548,9 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>();
       }
-      throw Exception('Failed to get artists: ${response.statusCode}');
+      _throwHttpFailure('Failed to get artists', response.statusCode, body: response.body);
     } catch (e) {
-      print('Error getting artists: $e');
+      AppLogger.debug('Error getting artists: $e');
       return [];
     }
   }
@@ -2558,7 +2558,7 @@ class ApiService {
   /// Get a single artist by user ID
   Future<Map<String, dynamic>?> getArtist(int userId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/$userId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2568,9 +2568,9 @@ class ApiService {
       } else if (response.statusCode == 404) {
         return null;
       }
-      throw Exception('Failed to get artist: ${response.statusCode}');
+      _throwHttpFailure('Failed to get artist', response.statusCode, body: response.body);
     } catch (e) {
-      print('Error getting artist: $e');
+      AppLogger.debug('Error getting artist: $e');
       return null;
     }
   }
@@ -2590,7 +2590,7 @@ class ApiService {
       if (bio != null) body['bio'] = bio;
       if (socialLinks != null) body['social_links'] = socialLinks;
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/artists'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -2599,9 +2599,9 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to create artist: ${response.statusCode}');
+      _throwHttpFailure('Failed to create artist', response.statusCode, body: response.body);
     } catch (e) {
-      print('Error creating artist: $e');
+      AppLogger.debug('Error creating artist: $e');
       return null;
     }
   }
@@ -2620,7 +2620,7 @@ class ApiService {
       if (bio != null) body['bio'] = bio;
       if (socialLinks != null) body['social_links'] = socialLinks;
       
-      final response = await http.put(
+      final response = await _httpClient.put(
         Uri.parse('$baseUrl/artists/$artistId'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -2629,9 +2629,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to update artist: ${response.statusCode}');
+      _throwHttpFailure('Failed to update artist', response.statusCode, body: response.body);
     } catch (e) {
-      print('Error updating artist: $e');
+      AppLogger.debug('Error updating artist: $e');
       return null;
     }
   }
@@ -2639,14 +2639,14 @@ class ApiService {
   /// Follow an artist
   Future<bool> followArtist(int artistId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/artists/$artistId/follow'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Error following artist: $e');
+      AppLogger.debug('Error following artist: $e');
       return false;
     }
   }
@@ -2660,7 +2660,7 @@ class ApiService {
   /// Get artist followers
   Future<List<Map<String, dynamic>>> getArtistFollowers(int artistId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/$artistId/followers'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2671,7 +2671,7 @@ class ApiService {
       }
       return [];
     } catch (e) {
-      print('Error getting artist followers: $e');
+      AppLogger.debug('Error getting artist followers: $e');
       return [];
     }
   }
@@ -2679,7 +2679,7 @@ class ApiService {
   /// Get artist content (podcasts, music)
   Future<Map<String, dynamic>> getArtistContent(int artistId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/$artistId/content'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 15));
@@ -2689,7 +2689,7 @@ class ApiService {
       }
       return {'podcasts': [], 'music': []};
     } catch (e) {
-      print('Error getting artist content: $e');
+      AppLogger.debug('Error getting artist content: $e');
       return {'podcasts': [], 'music': []};
     }
   }
@@ -2697,7 +2697,7 @@ class ApiService {
   /// Get current user's artist profile (auto-creates if not exists)
   Future<Map<String, dynamic>> getMyArtist() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/me'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2707,16 +2707,16 @@ class ApiService {
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       }
-      throw Exception('Failed to get artist profile: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to get artist profile', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting artist profile: $e');
+      _throwOperationError('Error getting artist profile', e);
     }
   }
 
   /// Get artist by user ID
   Future<Map<String, dynamic>> getArtistByUserId(int userId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/by-user/$userId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2726,16 +2726,16 @@ class ApiService {
       } else if (response.statusCode == 404) {
         throw Exception('Artist not found for this user');
       }
-      throw Exception('Failed to get artist: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to get artist', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting artist: $e');
+      _throwOperationError('Error getting artist', e);
     }
   }
 
   /// Update current user's artist profile
   Future<Map<String, dynamic>> updateMyArtist(Map<String, dynamic> data) async {
     try {
-      final response = await http.put(
+      final response = await _httpClient.put(
         Uri.parse('$baseUrl/artists/me'),
         headers: await _getHeaders(),
         body: json.encode(data),
@@ -2746,9 +2746,9 @@ class ApiService {
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       }
-      throw Exception('Failed to update artist profile: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to update artist profile', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error updating artist profile: $e');
+      _throwOperationError('Error updating artist profile', e);
     }
   }
 
@@ -2783,7 +2783,7 @@ class ApiService {
 
       request.headers.addAll(await _getHeaders());
 
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 2));
+      final streamedResponse = await _httpClient.send(request).timeout(const Duration(minutes: 2));
 
       if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
         final response = await http.Response.fromStream(streamedResponse);
@@ -2791,16 +2791,16 @@ class ApiService {
         return data['cover_image'] as String? ?? data['url'] as String? ?? '';
       }
 
-      throw Exception('Failed to upload cover image: HTTP ${streamedResponse.statusCode}');
+      _throwHttpFailure('Failed to upload cover image', streamedResponse.statusCode);
     } catch (e) {
-      throw Exception('Error uploading cover image: $e');
+      _throwOperationError('Error uploading cover image', e);
     }
   }
 
   /// Get podcasts by artist
   Future<List<ContentItem>> getArtistPodcasts(int artistId, {int skip = 0, int limit = 100}) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/artists/$artistId/podcasts?skip=$skip&limit=$limit'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2835,9 +2835,9 @@ class ApiService {
           );
         }).toList();
       }
-      throw Exception('Failed to get artist podcasts: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to get artist podcasts', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error getting artist podcasts: $e');
+      _throwOperationError('Error getting artist podcasts', e);
     }
   }
 
@@ -2868,21 +2868,21 @@ class ApiService {
   /// Delete a specific podcast
   Future<bool> deletePodcast(int podcastId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/podcasts/$podcastId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      throw Exception('Error deleting podcast: $e');
+      _throwOperationError('Error deleting podcast', e);
     }
   }
 
   /// Get all users (admin only)
   Future<List<dynamic>> getUsers({int skip = 0, int limit = 100}) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/admin/users?skip=$skip&limit=$limit'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -2891,16 +2891,16 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data;
       }
-      throw Exception('Failed to get users: ${response.statusCode}');
+      _throwHttpFailure('Failed to get users', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching users: $e');
+      _throwOperationError('Error fetching users', e);
     }
   }
 
   /// Update user admin status
   Future<bool> updateUserAdmin(int userId, bool isAdmin) async {
     try {
-      final response = await http.patch(
+      final response = await _httpClient.patch(
         Uri.parse('$baseUrl/admin/users/$userId/admin'),
         headers: await _getHeaders(),
         body: json.encode({'is_admin': isAdmin}),
@@ -2908,21 +2908,21 @@ class ApiService {
       
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error updating user admin status: $e');
+      _throwOperationError('Error updating user admin status', e);
     }
   }
 
   /// Delete a user (admin only)
   Future<bool> deleteUser(int userId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/admin/users/$userId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
       
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      throw Exception('Error deleting user: $e');
+      _throwOperationError('Error deleting user', e);
     }
   }
 
@@ -2947,7 +2947,7 @@ class ApiService {
         'cover_image': coverImage,
       }..removeWhere((k, v) => v == null);
 
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/events/'),
         headers: await _getHeaders(),
         body: json.encode(body),
@@ -2956,9 +2956,9 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to create event: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to create event', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error creating event: $e');
+      _throwOperationError('Error creating event', e);
     }
   }
 
@@ -2978,7 +2978,7 @@ class ApiService {
       if (upcomingOnly) queryParams['upcoming_only'] = 'true';
 
       final uri = Uri.parse('$baseUrl/events/').replace(queryParameters: queryParams);
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 15));
@@ -2986,16 +2986,16 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to fetch events: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch events', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching events: $e');
+      _throwOperationError('Error fetching events', e);
     }
   }
 
   /// Get event details by ID
   Future<Map<String, dynamic>> getEvent(int eventId) async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/events/$eventId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3003,16 +3003,16 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to fetch event: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch event', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching event: $e');
+      _throwOperationError('Error fetching event', e);
     }
   }
 
   /// Request to join an event
   Future<Map<String, dynamic>> joinEvent(int eventId) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/events/$eventId/join'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3020,23 +3020,23 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to join event: HTTP ${response.statusCode} - ${response.body}');
+      _throwHttpFailure('Failed to join event', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error joining event: $e');
+      _throwOperationError('Error joining event', e);
     }
   }
 
   /// Leave an event
   Future<bool> leaveEvent(int eventId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/events/$eventId/leave'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error leaving event: $e');
+      _throwOperationError('Error leaving event', e);
     }
   }
 
@@ -3048,7 +3048,7 @@ class ApiService {
         uri = uri.replace(queryParameters: {'status_filter': statusFilter});
       }
 
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3056,16 +3056,16 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as List<dynamic>;
       }
-      throw Exception('Failed to fetch attendees: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch attendees', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching attendees: $e');
+      _throwOperationError('Error fetching attendees', e);
     }
   }
 
   /// Update attendee status (approve/reject)
   Future<bool> updateAttendeeStatus(int eventId, int userId, String status) async {
     try {
-      final response = await http.put(
+      final response = await _httpClient.put(
         Uri.parse('$baseUrl/events/$eventId/attendees/$userId'),
         headers: await _getHeaders(),
         body: json.encode({'status': status}),
@@ -3073,14 +3073,14 @@ class ApiService {
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error updating attendee status: $e');
+      _throwOperationError('Error updating attendee status', e);
     }
   }
 
   /// Get my hosted events
   Future<List<dynamic>> getMyHostedEvents() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/events/my/hosted'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3088,16 +3088,16 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as List<dynamic>;
       }
-      throw Exception('Failed to fetch hosted events: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch hosted events', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching hosted events: $e');
+      _throwOperationError('Error fetching hosted events', e);
     }
   }
 
   /// Get events I'm attending
   Future<List<dynamic>> getMyAttendingEvents() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/events/my/attending'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3105,23 +3105,23 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as List<dynamic>;
       }
-      throw Exception('Failed to fetch attending events: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch attending events', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching attending events: $e');
+      _throwOperationError('Error fetching attending events', e);
     }
   }
 
   /// Delete/cancel an event
   Future<bool> deleteEvent(int eventId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/events/$eventId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error deleting event: $e');
+      _throwOperationError('Error deleting event', e);
     }
   }
 
@@ -3144,7 +3144,7 @@ class ApiService {
         },
       );
 
-      final response = await http.get(
+      final response = await _httpClient.get(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3152,16 +3152,16 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('Failed to fetch notifications: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch notifications', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching notifications: $e');
+      _throwOperationError('Error fetching notifications', e);
     }
   }
 
   /// Get unread notification count
   Future<int> getUnreadNotificationCount() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/notifications/unread-count'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
@@ -3170,16 +3170,16 @@ class ApiService {
         final data = json.decode(response.body);
         return data['unread_count'] as int? ?? 0;
       }
-      throw Exception('Failed to fetch unread count: HTTP ${response.statusCode}');
+      _throwHttpFailure('Failed to fetch unread count', response.statusCode, body: response.body);
     } catch (e) {
-      throw Exception('Error fetching unread count: $e');
+      _throwOperationError('Error fetching unread count', e);
     }
   }
 
   /// Mark specific notifications as read
   Future<bool> markNotificationsAsRead(List<int> notificationIds) async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/notifications/read'),
         headers: await _getHeaders(),
         body: json.encode({'notification_ids': notificationIds}),
@@ -3187,35 +3187,35 @@ class ApiService {
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error marking notifications as read: $e');
+      _throwOperationError('Error marking notifications as read', e);
     }
   }
 
   /// Mark all notifications as read
   Future<bool> markAllNotificationsAsRead() async {
     try {
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/notifications/read-all'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error marking all notifications as read: $e');
+      _throwOperationError('Error marking all notifications as read', e);
     }
   }
 
   /// Delete a notification
   Future<bool> deleteNotification(int notificationId) async {
     try {
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         Uri.parse('$baseUrl/notifications/$notificationId'),
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error deleting notification: $e');
+      _throwOperationError('Error deleting notification', e);
     }
   }
 
@@ -3226,14 +3226,14 @@ class ApiService {
         queryParameters: readOnly ? {'read_only': 'true'} : null,
       );
 
-      final response = await http.delete(
+      final response = await _httpClient.delete(
         uri,
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Error deleting all notifications: $e');
+      _throwOperationError('Error deleting all notifications', e);
     }
   }
 }

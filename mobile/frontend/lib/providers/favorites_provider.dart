@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../models/content_item.dart';
+import '../utils/app_logger.dart';
 
 class FavoritesProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -109,7 +110,7 @@ class FavoritesProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to load favorites: $e';
-      print('Error fetching favorites: $e');
+      AppLogger.debug('Error fetching favorites: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -152,7 +153,7 @@ class FavoritesProvider extends ChangeNotifier {
       }
       return success;
     } catch (e) {
-      print('Error toggling favorite: $e');
+      AppLogger.debug('Error toggling favorite: $e');
       _revertOptimisticUpdate(item, isCurrentlyFavorite);
       return false;
     }
@@ -185,7 +186,7 @@ class FavoritesProvider extends ChangeNotifier {
       }
       return isFav;
     } catch (e) {
-      print('Error checking favorite: $e');
+      AppLogger.debug('Error checking favorite: $e');
       return _favoriteIds.contains(contentId.toString());
     }
   }

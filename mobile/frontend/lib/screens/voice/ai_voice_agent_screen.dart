@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import '../../widgets/voice/animated_voice_bubble.dart';
+import '../../utils/app_logger.dart';
 
 /// Screen for interacting with AI Voice Agent via LiveKit
 class AIVoiceAgentScreen extends StatefulWidget {
@@ -59,7 +60,7 @@ class _AIVoiceAgentScreenState extends State<AIVoiceAgentScreen> {
             throw TimeoutException('Room creation timed out after 10 seconds');
           },
         );
-        print('✅ Room created: $roomName');
+        AppLogger.debug('✅ Room created: $roomName');
         setState(() {
           _connectionStatus = 'Room created, connecting...';
         });
@@ -67,7 +68,7 @@ class _AIVoiceAgentScreenState extends State<AIVoiceAgentScreen> {
         // Check if error is because room already exists
         final errorMsg = e.toString().toLowerCase();
         if (errorMsg.contains('already exists') || errorMsg.contains('duplicate')) {
-          print('ℹ️ Room already exists: $roomName');
+          AppLogger.debug('ℹ️ Room already exists: $roomName');
           setState(() {
             _connectionStatus = 'Room exists, connecting...';
           });
@@ -84,7 +85,7 @@ class _AIVoiceAgentScreenState extends State<AIVoiceAgentScreen> {
           } else if (errorMsg.contains('cors')) {
             detailedError = 'CORS error. Please check backend CORS configuration.';
           }
-          print('❌ Room creation error: $detailedError');
+          AppLogger.debug('❌ Room creation error: $detailedError');
           throw Exception(detailedError);
         }
       }
@@ -116,7 +117,7 @@ class _AIVoiceAgentScreenState extends State<AIVoiceAgentScreen> {
               .any((p) => p.kind == lk.ParticipantKind.AGENT);
           if (hasAgent) {
             agentJoined = true;
-            print('✅ Agent joined the room');
+            AppLogger.debug('✅ Agent joined the room');
             break;
           }
         }

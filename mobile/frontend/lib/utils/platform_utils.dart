@@ -62,5 +62,26 @@ class PlatformUtils {
     }
     return const EdgeInsets.only(top: 8, bottom: 8);
   }
+
+  /// Height of the bottom navigation bar content (excluding safe-area inset).
+  static double bottomNavigationBarHeight(BuildContext context) {
+    final isSmallScreen = MediaQuery.sizeOf(context).width < 400;
+    if (isIOS) {
+      return isSmallScreen ? 98.0 : 93.0;
+    }
+    return 73.0;
+  }
+
+  /// Total bottom padding scrollable content needs when the scaffold uses extendBody.
+  static double bottomNavContentPadding(
+    BuildContext context, {
+    double extra = 0,
+  }) {
+    return bottomNavigationBarHeight(context) +
+        MediaQuery.paddingOf(context).bottom +
+        extra;
+  }
+
+  static const double minimizedAudioPlayerHeight = 80.0;
 }
 

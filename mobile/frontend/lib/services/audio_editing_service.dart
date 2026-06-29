@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'api_service.dart';
-import 'package:http/http.dart' as http;
+import '../utils/pinned_http_client.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
@@ -149,7 +149,7 @@ class AudioEditingService {
       
       onProgress?.call(80);
       
-      final response = await http.get(Uri.parse(fullUrl));
+      final response = await PinnedHttpClient.instance.get(Uri.parse(fullUrl));
       if (response.statusCode == 200) {
         final file = File(savePath);
         await file.writeAsBytes(response.bodyBytes);
@@ -286,7 +286,7 @@ class AudioEditingService {
       
       onProgress?.call(80);
       
-      final response = await http.get(Uri.parse(fullUrl));
+      final response = await PinnedHttpClient.instance.get(Uri.parse(fullUrl));
       if (response.statusCode == 200) {
         final file = File(savePath);
         await file.writeAsBytes(response.bodyBytes);

@@ -5,6 +5,7 @@ import '../../theme/app_typography.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/shared/empty_state.dart';
 import '../../widgets/shared/loading_shimmer.dart';
+import '../../utils/app_logger.dart';
 
 /// Admin Approved Page - Shows all approved content with tabs
 /// Tabs: All, Podcasts, Movies, Posts
@@ -112,7 +113,7 @@ class _AdminApprovedPageState extends State<AdminApprovedPage>
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ Error fetching approved content: $e');
+      AppLogger.debug('❌ Error fetching approved content: $e');
       setState(() {
         _error = 'Failed to load approved content';
         _isLoading = false;

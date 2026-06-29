@@ -8,6 +8,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../meeting/meeting_room_screen.dart';
+import '../../utils/app_logger.dart';
 
 /// Live Stream Start Screen - Setup Screen
 /// Shows camera preview and stream title input before going live
@@ -51,7 +52,7 @@ class _LiveStreamStartScreenState extends State<LiveStreamStartScreen> {
         setState(() => _isInitializingCamera = false);
       }
     } catch (e) {
-      print('Error initializing camera: $e');
+      AppLogger.debug('Error initializing camera: $e');
       if (mounted) {
         setState(() {
           _isInitializingCamera = false;

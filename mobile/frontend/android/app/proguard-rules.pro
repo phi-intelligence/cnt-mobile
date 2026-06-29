@@ -71,8 +71,10 @@
 -keep class com.stripe.android.** { *; }
 -dontwarn com.stripe.android.**
 
-# ============================================
-# Additional Flutter/Android warnings to suppress
-# ============================================
+# Flutter Secure Storage
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+
+# App security / networking
+-keep class com.christtabernacle.cntmedia.MainActivity { *; }
 -dontwarn io.flutter.embedding.engine.deferredcomponents.**
 

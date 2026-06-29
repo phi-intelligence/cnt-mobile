@@ -5,6 +5,8 @@ import '../services/donation_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/security_hardening.dart';
+import '../utils/api_error_utils.dart';
 
 class DonationModal extends StatefulWidget {
   final String recipientName;
@@ -38,10 +40,10 @@ class _DonationModalState extends State<DonationModal> {
     }
 
     final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
+    if (amount == null || amount < 1 || amount > 10000) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid amount'),
+          content: Text('Please enter an amount between \$1 and \$10,000'),
           backgroundColor: Colors.red,
         ),
       );
@@ -126,7 +128,8 @@ class _DonationModalState extends State<DonationModal> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
     
-    return Dialog(
+    return SecureScreen(
+      child: Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -269,6 +272,7 @@ class _DonationModalState extends State<DonationModal> {
           ),
         ),
       ),
+    ),
     );
   }
 }

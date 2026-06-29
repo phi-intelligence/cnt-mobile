@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:http/http.dart' as http;
 import '../config/environment.dart';
+import '../utils/pinned_http_client.dart';
 import 'auth_service.dart';
 
 /// Background message handler - must be a top-level function
@@ -235,7 +235,7 @@ class PushNotificationService {
       final platform = Platform.isIOS ? 'ios' : 'android';
       final baseUrl = Environment.apiBaseUrl;
       
-      final response = await http.post(
+      final response = await PinnedHttpClient.instance.post(
         Uri.parse('$baseUrl/device-tokens/register'),
         headers: {
           'Content-Type': 'application/json',
@@ -284,7 +284,7 @@ class PushNotificationService {
       
       final baseUrl = Environment.apiBaseUrl;
       
-      await http.delete(
+      await PinnedHttpClient.instance.delete(
         Uri.parse('$baseUrl/device-tokens'),
         headers: {
           'Content-Type': 'application/json',

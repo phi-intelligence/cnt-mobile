@@ -6,6 +6,7 @@ import '../../theme/app_spacing.dart';
 import '../../widgets/admin/admin_content_card.dart';
 import '../../widgets/shared/empty_state.dart';
 import '../../widgets/shared/loading_shimmer.dart';
+import '../../utils/app_logger.dart';
 
 /// Reject reason dialog
 class _RejectReasonDialog extends StatefulWidget {
@@ -248,7 +249,7 @@ class _AdminPendingPageState extends State<AdminPendingPage>
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ Error fetching pending content: $e');
+      AppLogger.debug('❌ Error fetching pending content: $e');
       setState(() {
         _error = 'Failed to load pending content: $e';
         _isLoading = false;
