@@ -80,7 +80,27 @@ class AuthService {
 
   Future<bool> isAuthenticated() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    if (token == null || token.isEmpty) return false;
+    return !_isJwtExpired(token);
+  }
+
+  /// Client-side expiry check for UX only — server remains authoritative.
+  bool _isJwtExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final decoded = jsonDecode(utf8.decode(base64Url.decode(normalized))) as Map<String, dynamic>;
+      final exp = decoded['exp'];
+      if (exp == null) return false;
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch((exp as num).toInt() * 1000);
+      return DateTime.now().isAfter(expiry);
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<bool> isAdmin() async {

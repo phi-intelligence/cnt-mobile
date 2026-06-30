@@ -11,6 +11,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 import '../../utils/app_logger.dart';
+import '../../utils/security_hardening.dart';
 
 /// Meeting Room Screen - LiveKit meeting UI
 /// Custom UI built on top of LiveKit SDK
@@ -764,6 +765,10 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return SecureScreen(child: _buildMeetingContent(context));
+  }
+
+  Widget _buildMeetingContent(BuildContext context) {
     if (_joining) {
       return Scaffold(
         backgroundColor: _meetingBackgroundDark,

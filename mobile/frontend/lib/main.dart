@@ -13,8 +13,11 @@ Future<void> main() async {
 
   await Environment.initialize();
 
-  if (!kDebugMode && await SecurityHardening.isDeviceCompromised()) {
-    AppLogger.warning('Device integrity check failed');
+  if (!kDebugMode && !Environment.isDevelopment) {
+    if (await SecurityHardening.isDeviceCompromised()) {
+      SecurityHardening.blockSensitiveFeatures();
+      AppLogger.warning('Device integrity check failed — payments and admin disabled');
+    }
   }
 
   await Firebase.initializeApp();

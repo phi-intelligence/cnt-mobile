@@ -17,7 +17,6 @@ dependencies:
   # HTTP & WebSocket
   http: ^1.1.0
   socket_io_client: ^2.0.3+1
-  dio: ^5.4.0
   web_socket_channel: ^2.4.0
   
   # Media Players
@@ -101,7 +100,6 @@ flutter:
   # Assets
   assets:
     - assets/images/
-    - .env
   
   # Fonts commented out until files exist
   # fonts:

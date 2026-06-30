@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/api_service.dart';
+import '../services/push_notification_service.dart';
+import '../services/websocket_service.dart';
 import '../utils/app_logger.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -29,11 +31,11 @@ class AuthProvider extends ChangeNotifier {
   /// Called when API service detects an expired session (401 after refresh attempt fails)
   void _handleSessionExpired() {
     AppLogger.debug('🔒 Session expired - logging out user');
-    // Clear local state without making network calls
     _user = null;
     _isAuthenticated = false;
     _error = 'Session expired. Please log in again.';
-    // Clear stored credentials
+    PushNotificationService().unregisterToken();
+    WebSocketService().disconnect();
     _authService.logout();
     notifyListeners();
   }
@@ -82,6 +84,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
   
+  Future<void> _onAuthSuccess() async {
+    await PushNotificationService().registerTokenAfterLogin();
+    await WebSocketService().reconnect();
+  }
+
   Future<bool> login(String usernameOrEmail, String password) async {
     _isLoading = true;
     _error = null;
@@ -98,6 +105,7 @@ class AuthProvider extends ChangeNotifier {
       };
       _isAuthenticated = true;
       _error = null;
+      await _onAuthSuccess();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -115,6 +123,8 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
+      await PushNotificationService().unregisterToken();
+      WebSocketService().disconnect();
       await _authService.logout();
       _user = null;
       _isAuthenticated = false;
@@ -161,6 +171,7 @@ class AuthProvider extends ChangeNotifier {
       };
       _isAuthenticated = true;
       _error = null;
+      await _onAuthSuccess();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -205,6 +216,7 @@ class AuthProvider extends ChangeNotifier {
       };
       _isAuthenticated = true;
       _error = null;
+      await _onAuthSuccess();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -244,6 +256,7 @@ class AuthProvider extends ChangeNotifier {
       };
       _isAuthenticated = true;
       _error = null;
+      await _onAuthSuccess();
       return true;
     } catch (e) {
       _error = e.toString();

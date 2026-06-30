@@ -126,6 +126,22 @@ class _DonationModalState extends State<DonationModal> {
 
   @override
   Widget build(BuildContext context) {
+    if (SecurityHardening.isSensitiveFeaturesBlocked) {
+      return SecureScreen(
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: Text(
+              'Donations are unavailable on modified devices for security reasons.',
+              style: AppTypography.body.copyWith(color: AppColors.errorMain),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
     
     return SecureScreen(

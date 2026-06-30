@@ -131,6 +131,11 @@ class _GooglePickerWebViewScreenState extends State<GooglePickerWebViewScreen> {
         window.initSecurePicker();
       }
     ''');
+
+    // Minimize token lifetime in memory after injection into the WebView.
+    if (mounted) {
+      setState(() => _accessToken = null);
+    }
   }
 
   void _handlePickerMessage(String raw) {
@@ -150,6 +155,7 @@ class _GooglePickerWebViewScreenState extends State<GooglePickerWebViewScreen> {
     if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(fileId)) return;
 
     widget.onFileSelected(fileId, fileName, mimeType);
+    _accessToken = null;
     _clearPickerToken();
     if (mounted) Navigator.pop(context);
   }

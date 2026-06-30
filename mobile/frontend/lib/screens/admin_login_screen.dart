@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../navigation/mobile_navigation.dart';
+import '../utils/security_hardening.dart';
 import 'admin_dashboard.dart';
 
 class AdminLoginScreen extends StatefulWidget {
@@ -13,8 +14,8 @@ class AdminLoginScreen extends StatefulWidget {
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'admin@christtabernacle.com');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -68,7 +69,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SecureScreen(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Admin Login'),
         automaticallyImplyLeading: true,
@@ -183,6 +185,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../utils/security_hardening.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 
@@ -35,6 +36,14 @@ class _AdminGuardState extends State<AdminGuard> {
   }
 
   Future<void> _verifyAdmin() async {
+    if (SecurityHardening.isSensitiveFeaturesBlocked) {
+      setState(() {
+        _checking = false;
+        _allowed = false;
+      });
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     if (!auth.isAdmin) {
       setState(() {
@@ -71,14 +80,20 @@ class _AdminGuardState extends State<AdminGuard> {
     }
 
     if (!_allowed) {
+      final compromised = SecurityHardening.isSensitiveFeaturesBlocked;
       return widget.denied ??
           Scaffold(
             appBar: AppBar(title: const Text('Access Denied')),
             body: Center(
-              child: Text(
-                'You do not have permission to access this area.',
-                style: AppTypography.body.copyWith(color: AppColors.errorMain),
-                textAlign: TextAlign.center,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  compromised
+                      ? 'Admin features are unavailable on modified devices for security reasons.'
+                      : 'You do not have permission to access this area.',
+                  style: AppTypography.body.copyWith(color: AppColors.errorMain),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           );

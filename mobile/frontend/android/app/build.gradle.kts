@@ -58,14 +58,16 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // Fail fast in CI/production if keystore is missing
-                signingConfigs.getByName("debug")
+            if (!keystorePropertiesFile.exists()) {
+                throw GradleException(
+                    "Release builds require android/key.properties with a release keystore. " +
+                    "Do not ship release APKs signed with the debug key."
+                )
             }
+            signingConfig = signingConfigs.getByName("release")
             
-            // Enable code shrinking and resource optimization for production
+            // Enable code shrinking and resource optimization for production.
+            // Use scripts/release_build.sh for --obfuscate and --split-debug-info.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

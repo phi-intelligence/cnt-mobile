@@ -96,12 +96,12 @@ class WebSocketService {
     _socket?.dispose();
     _isConnected = false;
     _socket = null;
-    if (!_liveStreamStartedController.isClosed) {
-      _liveStreamStartedController.close();
-    }
-    if (!_speakPermissionRequestedController.isClosed) {
-      _speakPermissionRequestedController.close();
-    }
+  }
+
+  /// Reconnect with a fresh auth token (e.g. after login).
+  Future<void> reconnect() async {
+    disconnect();
+    await connect();
   }
 
   void send(Map<String, dynamic> data) {

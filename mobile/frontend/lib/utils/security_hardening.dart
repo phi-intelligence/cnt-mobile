@@ -12,6 +12,15 @@ class SecurityHardening {
 
   static const _channel = MethodChannel('com.christtabernacle.cntmedia/security');
 
+  static bool _sensitiveFeaturesBlocked = false;
+
+  /// True when root/jailbreak was detected — payments and admin are degraded.
+  static bool get isSensitiveFeaturesBlocked => _sensitiveFeaturesBlocked;
+
+  static void blockSensitiveFeatures() {
+    _sensitiveFeaturesBlocked = true;
+  }
+
   /// Apply FLAG_SECURE to prevent screenshots on sensitive screens.
   static Future<void> enableScreenProtection() async {
     if (kIsWeb) return;
