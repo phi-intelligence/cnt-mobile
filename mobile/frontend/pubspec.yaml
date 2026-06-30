@@ -100,6 +100,8 @@ flutter:
   # Assets
   assets:
     - assets/images/
+    # Local dev: gitignored .env (copy from env.example). Release CI uses --dart-define.
+    - .env
   
   # Fonts commented out until files exist
   # fonts:

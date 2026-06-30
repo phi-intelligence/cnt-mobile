@@ -21,6 +21,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// package name + signing SHA-1/SHA-256 and iOS bundle ID.
 class Environment {
   static bool _initialized = false;
+  static bool _dotenvLoaded = false;
   
   // ============================================
   // DEVELOPMENT URLs (platform-specific defaults)
@@ -65,17 +66,22 @@ class Environment {
   static Future<void> initialize() async {
     if (_initialized) return;
     
-    if (kDebugMode) {
-      try {
-        await dotenv.load(fileName: '.env');
+    try {
+      await dotenv.load(fileName: '.env');
+      _dotenvLoaded = true;
+      if (kDebugMode) {
         debugPrint('✅ Environment: Loaded .env file');
-      } catch (e) {
-        debugPrint('⚠️ Environment: .env file not found, using defaults (development)');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '⚠️ Environment: .env not loaded ($e) — using --dart-define or dev defaults',
+        );
       }
     }
-    
+
     _initialized = true;
-    
+
     if (kDebugMode) {
       debugPrint('📱 Environment Configuration:');
       debugPrint('   ENVIRONMENT: $environment');
@@ -85,18 +91,23 @@ class Environment {
       debugPrint('   MEDIA_BASE_URL: $mediaBaseUrl');
       debugPrint('   LIVEKIT_WS_URL: $liveKitWsUrl');
       debugPrint('   LIVEKIT_HTTP_URL: $liveKitHttpUrl');
-      
+
       if (isProduction) {
-        if (dotenv.maybeGet('API_BASE_URL') == null &&
+        if (_dotenvGet('API_BASE_URL') == null &&
             const String.fromEnvironment('API_BASE_URL').isEmpty) {
           debugPrint('⚠️ WARNING: ENVIRONMENT=production but API_BASE_URL not set');
         }
-        if (dotenv.maybeGet('MEDIA_BASE_URL') == null &&
+        if (_dotenvGet('MEDIA_BASE_URL') == null &&
             const String.fromEnvironment('MEDIA_BASE_URL').isEmpty) {
           debugPrint('⚠️ WARNING: ENVIRONMENT=production but MEDIA_BASE_URL not set');
         }
       }
     }
+  }
+
+  static String? _dotenvGet(String key) {
+    if (!_dotenvLoaded || !dotenv.isInitialized) return null;
+    return dotenv.maybeGet(key);
   }
   
   // ============================================
@@ -109,7 +120,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('ENVIRONMENT');
     if (dartDefine.isNotEmpty) return dartDefine.toLowerCase();
     
-    final dotenvValue = dotenv.maybeGet('ENVIRONMENT');
+    final dotenvValue = _dotenvGet('ENVIRONMENT');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue.toLowerCase();
     
     return 'development';
@@ -130,7 +141,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('API_BASE_URL');
     if (dartDefine.isNotEmpty) return dartDefine;
     
-    final dotenvValue = dotenv.maybeGet('API_BASE_URL');
+    final dotenvValue = _dotenvGet('API_BASE_URL');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue;
     
     return _devApiBaseUrl;
@@ -141,7 +152,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('WEBSOCKET_URL');
     if (dartDefine.isNotEmpty) return dartDefine;
     
-    final dotenvValue = dotenv.maybeGet('WEBSOCKET_URL');
+    final dotenvValue = _dotenvGet('WEBSOCKET_URL');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue;
     
     return _devWebSocketUrl;
@@ -152,7 +163,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('MEDIA_BASE_URL');
     if (dartDefine.isNotEmpty) return dartDefine;
     
-    final dotenvValue = dotenv.maybeGet('MEDIA_BASE_URL');
+    final dotenvValue = _dotenvGet('MEDIA_BASE_URL');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue;
     
     return _devMediaBaseUrl;
@@ -163,7 +174,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('LIVEKIT_WS_URL');
     if (dartDefine.isNotEmpty) return dartDefine;
     
-    final dotenvValue = dotenv.maybeGet('LIVEKIT_WS_URL');
+    final dotenvValue = _dotenvGet('LIVEKIT_WS_URL');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue;
     
     return _devLiveKitWsUrl;
@@ -174,7 +185,7 @@ class Environment {
     const dartDefine = String.fromEnvironment('LIVEKIT_HTTP_URL');
     if (dartDefine.isNotEmpty) return dartDefine;
     
-    final dotenvValue = dotenv.maybeGet('LIVEKIT_HTTP_URL');
+    final dotenvValue = _dotenvGet('LIVEKIT_HTTP_URL');
     if (dotenvValue != null && dotenvValue.isNotEmpty) return dotenvValue;
     
     return _devLiveKitHttpUrl;

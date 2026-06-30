@@ -268,7 +268,6 @@ class _PrejoinScreenState extends State<PrejoinScreen> {
               ),
             ),
       ),
-    ),
     );
   }
 }
