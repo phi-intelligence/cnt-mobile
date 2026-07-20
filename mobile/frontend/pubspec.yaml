@@ -17,7 +17,6 @@ dependencies:
   # HTTP & WebSocket
   http: ^1.1.0
   socket_io_client: ^2.0.3+1
-  dio: ^5.4.0
   web_socket_channel: ^2.4.0
   
   # Media Players
@@ -59,6 +58,7 @@ dependencies:
   # Utils
   intl: ^0.20.2
   uuid: ^4.2.1
+  crypto: ^3.0.6
   url_launcher: ^6.2.2
   webview_flutter: ^4.4.2
   pdfx: ^2.4.0
@@ -100,6 +100,7 @@ flutter:
   # Assets
   assets:
     - assets/images/
+    # Local dev: gitignored .env (copy from env.example). Release CI uses --dart-define.
     - .env
   
   # Fonts commented out until files exist

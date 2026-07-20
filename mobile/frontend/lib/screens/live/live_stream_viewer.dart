@@ -8,6 +8,7 @@ import '../../widgets/meeting/video_track_view.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
+import '../../utils/app_logger.dart';
 
 /// Live Stream Viewer Screen - Watch live streams using LiveKit
 class LiveStreamViewer extends StatefulWidget {
@@ -228,7 +229,7 @@ class _LiveStreamViewerState extends State<LiveStreamViewer> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      print('Error leaving stream: $e');
+      AppLogger.debug('Error leaving stream: $e');
     }
   }
 

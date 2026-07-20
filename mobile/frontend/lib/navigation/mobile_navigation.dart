@@ -69,12 +69,6 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
-    // Account for SafeArea padding - reduce by a few pixels to prevent overflow
-    final tabBarHeight = PlatformUtils.isIOS
-        ? (isSmallScreen ? 98 : 93)
-        : 73;
-
-    final safeBottomInset = MediaQuery.of(context).padding.bottom;
 
     final isAdmin = context.select<AuthProvider, bool>((provider) => provider.isAdmin);
     final adminSupportCount = isAdmin
@@ -105,11 +99,10 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
         }
       },
       child: Scaffold(
-        extendBody: true, // Allow content to extend behind navbar/player
+        extendBody: false,
         body: Stack(
-          fit: StackFit.expand, // Ensure full screen bounds for proper positioning
+          fit: StackFit.expand,
           children: [
-            // Screen content
             _screens[_currentIndex],
             // Notification banner at top
             const Positioned(
@@ -126,17 +119,9 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
                 if (_currentIndex != 0 || audioPlayer.currentTrack == null) {
                   return const SizedBox.shrink();
                 }
-                
-                final playerState = _playerKey.currentState;
-                final isExpanded = playerState?.isExpanded ?? false;
-                
-                // Position player at bottom
-                // When expanded: fill full screen (bottom: 0)
-                // When minimized: position directly above navbar (navbar is at bottom: 0, player sits above it)
-                final minimizedBottom = tabBarHeight + safeBottomInset;
-                final compactBottom = minimizedBottom > 4 ? minimizedBottom - 4 : 0.0;
+
                 return Positioned(
-                  bottom: isExpanded ? 0.0 : compactBottom,
+                  bottom: 0.0,
                   left: 0.0,
                   right: 0.0,
                   child: SlidingAudioPlayer(key: _playerKey),
@@ -180,7 +165,9 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
                 // 1. No track playing, OR
                 // 2. Track playing but player is minimized (not expanded)
                 final shouldShowNav = audioPlayer.currentTrack == null || !isExpanded;
-                return shouldShowNav ? SafeArea(
+                return shouldShowNav ? Container(
+          color: AppColors.backgroundPrimary,
+          child: SafeArea(
           top: false,
           child: Container(
             decoration: BoxDecoration(
@@ -248,6 +235,7 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
           ),
         ],
             ),
+          ),
           ),
         ) : const SizedBox.shrink();
               },

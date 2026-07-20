@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../services/download_service.dart';
 import '../models/content_item.dart';
+import '../utils/app_logger.dart';
 
 class DownloadProvider extends ChangeNotifier {
   final DownloadService _service = DownloadService();
@@ -73,7 +74,7 @@ class DownloadProvider extends ChangeNotifier {
     try {
       _completedDownloads = await _service.getDownloads();
     } catch (e) {
-      print('Error loading downloads: $e');
+      AppLogger.debug('Error loading downloads: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

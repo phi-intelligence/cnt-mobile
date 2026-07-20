@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
 import '../models/content_item.dart';
+import '../utils/app_logger.dart';
 
 class PodcastsScreen extends StatefulWidget {
   const PodcastsScreen({super.key});
@@ -60,7 +61,7 @@ class _PodcastsScreenState extends State<PodcastsScreen> {
       _error = null;
     } catch (e) {
       _error = 'Failed to load podcasts: $e';
-      print('Error fetching podcasts: $e');
+      AppLogger.debug('Error fetching podcasts: $e');
     } finally {
       if (mounted) {
         setState(() {

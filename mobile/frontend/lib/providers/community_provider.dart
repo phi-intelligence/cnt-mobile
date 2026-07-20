@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 class CommunityProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -44,7 +45,7 @@ class CommunityProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to load posts: $e';
-      print('Error fetching posts: $e');
+      AppLogger.debug('Error fetching posts: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -85,7 +86,7 @@ class CommunityProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      print('Error liking post: $e');
+      AppLogger.debug('Error liking post: $e');
       // Optionally show an error message to user
     }
   }
@@ -97,7 +98,7 @@ class CommunityProvider extends ChangeNotifier {
       _comments[postId] = comments;
       notifyListeners();
     } catch (e) {
-      print('Error fetching comments: $e');
+      AppLogger.debug('Error fetching comments: $e');
       _comments[postId] = [];
     }
   }
@@ -137,7 +138,7 @@ class CommunityProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      print('Error adding comment: $e');
+      AppLogger.debug('Error adding comment: $e');
       rethrow;
     }
   }

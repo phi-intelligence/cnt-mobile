@@ -7,6 +7,15 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.christtabernacle.cntmedia"
     compileSdk = flutter.compileSdkVersion
@@ -19,6 +28,17 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
     }
 
     defaultConfig {
@@ -38,14 +58,12 @@ android {
 
     buildTypes {
         release {
-            // For production release, you should create a keystore and configure signing:
-            // 1. Generate keystore: keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-            // 2. Create key.properties file with storePassword, keyPassword, keyAlias, storeFile
-            // 3. Configure signingConfigs.create("release") with the keystore
-            // For now, using debug signing for testing
-            signingConfig = signingConfigs.getByName("debug")
-            
-            // Enable code shrinking and resource optimization for production
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+
+            // Enable code shrinking and resource optimization for production.
+            // Use scripts/release_build.sh for --obfuscate and --split-debug-info.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -53,9 +71,8 @@ android {
                 "proguard-rules.pro"
             )
         }
-        
+
         debug {
-            // Debug build settings
             isMinifyEnabled = false
             isShrinkResources = false
         }
@@ -80,4 +97,20 @@ configurations.all {
 
 flutter {
     source = "../.."
+}
+
+// Fail release builds only when assembling/bundling release — not during debug configuration.
+gradle.taskGraph.whenReady {
+    val isReleaseTask = gradle.startParameter.taskNames.any { task ->
+        task.contains("Release", ignoreCase = true) &&
+            (task.contains("assemble", ignoreCase = true) ||
+                task.contains("bundle", ignoreCase = true) ||
+                task.contains("install", ignoreCase = true))
+    }
+    if (isReleaseTask && !keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "Release builds require android/key.properties with a release keystore. " +
+                "Do not ship release APKs signed with the debug key."
+        )
+    }
 }

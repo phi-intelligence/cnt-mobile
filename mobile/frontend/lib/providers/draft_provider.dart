@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 /// Draft types matching the backend DraftType enum
 enum DraftType {
@@ -186,7 +187,7 @@ class DraftProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to load drafts: $e';
-      print('Error fetching drafts: $e');
+      AppLogger.debug('Error fetching drafts: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -206,7 +207,7 @@ class DraftProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      print('Error creating draft: $e');
+      AppLogger.debug('Error creating draft: $e');
       return null;
     }
   }
@@ -228,7 +229,7 @@ class DraftProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      print('Error updating draft: $e');
+      AppLogger.debug('Error updating draft: $e');
       return null;
     }
   }
@@ -244,7 +245,7 @@ class DraftProvider extends ChangeNotifier {
       }
       return success;
     } catch (e) {
-      print('Error deleting draft: $e');
+      AppLogger.debug('Error deleting draft: $e');
       return false;
     }
   }
@@ -258,7 +259,7 @@ class DraftProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      print('Error getting draft: $e');
+      AppLogger.debug('Error getting draft: $e');
       return null;
     }
   }

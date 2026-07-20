@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/shared/pill_text_field.dart';
+import '../utils/security_hardening.dart';
 import 'register_screen.dart';
 
 /// Login Screen - Redesigned to match Web Landing Page style
@@ -110,7 +111,8 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     final screenSize = MediaQuery.of(context).size;
     final screenHeight = screenSize.height;
     
-    return Scaffold(
+    return SecureScreen(
+      child: Scaffold(
       backgroundColor: const Color(0xFFF5F0E8),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -356,6 +358,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

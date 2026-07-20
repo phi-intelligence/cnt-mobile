@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/content_item.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 /// Playback context determines queue behavior
 enum PlaybackContext {
@@ -76,7 +77,7 @@ class AudioPlayerState extends ChangeNotifier {
 
   Future<void> loadTrack(ContentItem track) async {
     if (track.audioUrl == null) {
-      print('No audio URL available for track');
+      AppLogger.debug('No audio URL available for track');
       return;
     }
     
@@ -86,26 +87,26 @@ class AudioPlayerState extends ChangeNotifier {
       await _player.setVolume(_volume);
       notifyListeners();
     } catch (e) {
-      print('Error loading track: $e');
+      AppLogger.debug('Error loading track: $e');
     }
   }
 
   /// Play a ContentItem directly (main entry point from UI)
   Future<void> playContent(ContentItem item) async {
     if (item.audioUrl == null) {
-      print('No audio URL available for ${item.title}');
+      AppLogger.debug('No audio URL available for ${item.title}');
       return;
     }
 
     _currentTrack = item;
     try {
-      print('Loading audio: ${item.audioUrl}');
+      AppLogger.debug('Loading audio: ${item.audioUrl}');
       await _player.setUrl(item.audioUrl!);
       await _player.setVolume(_volume);
       await play(); // Auto-play
       notifyListeners();
     } catch (e) {
-      print('Error playing content: $e');
+      AppLogger.debug('Error playing content: $e');
       _error = 'Failed to play audio: $e';
       notifyListeners();
     }
@@ -118,7 +119,7 @@ class AudioPlayerState extends ChangeNotifier {
     String? section,
   }) async {
     if (item.audioUrl == null) {
-      print('No audio URL available for ${item.title}');
+      AppLogger.debug('No audio URL available for ${item.title}');
       return;
     }
 
@@ -132,13 +133,13 @@ class AudioPlayerState extends ChangeNotifier {
     _artistTracksExhausted = false;
     
     try {
-      print('🎵 Playing ${item.title} with queue of ${_queue.length} tracks from section: $section');
+      AppLogger.debug('🎵 Playing ${item.title} with queue of ${_queue.length} tracks from section: $section');
       await _player.setUrl(item.audioUrl!);
       await _player.setVolume(_volume);
       await play();
       notifyListeners();
     } catch (e) {
-      print('Error playing content: $e');
+      AppLogger.debug('Error playing content: $e');
       _error = 'Failed to play audio: $e';
       notifyListeners();
     }
@@ -151,7 +152,7 @@ class AudioPlayerState extends ChangeNotifier {
     List<ContentItem> artistPlaylist,
   ) async {
     if (item.audioUrl == null) {
-      print('No audio URL available for ${item.title}');
+      AppLogger.debug('No audio URL available for ${item.title}');
       return;
     }
 
@@ -166,13 +167,13 @@ class AudioPlayerState extends ChangeNotifier {
     _currentOffset = 0;
     
     try {
-      print('🎵 Playing ${item.title} with ARTIST queue of ${_queue.length} tracks');
+      AppLogger.debug('🎵 Playing ${item.title} with ARTIST queue of ${_queue.length} tracks');
       await _player.setUrl(item.audioUrl!);
       await _player.setVolume(_volume);
       await play();
       notifyListeners();
     } catch (e) {
-      print('Error playing content: $e');
+      AppLogger.debug('Error playing content: $e');
       _error = 'Failed to play audio: $e';
       notifyListeners();
     }
@@ -187,7 +188,7 @@ class AudioPlayerState extends ChangeNotifier {
       _isPlaying = true;
       notifyListeners();
     } catch (e) {
-      print('Error playing: $e');
+      AppLogger.debug('Error playing: $e');
     }
   }
 
@@ -258,7 +259,7 @@ class AudioPlayerState extends ChangeNotifier {
     if (currentIndex >= 0 && currentIndex < _queue.length - 1) {
       // Play next track in queue
       final nextTrack = _queue[currentIndex + 1];
-      print('🎵 Auto-playing next track: ${nextTrack.title}');
+      AppLogger.debug('🎵 Auto-playing next track: ${nextTrack.title}');
       await loadTrack(nextTrack);
       await play();
     } else {
@@ -268,20 +269,20 @@ class AudioPlayerState extends ChangeNotifier {
         // Check if we got new tracks
         if (currentIndex < _queue.length - 1) {
           final nextTrack = _queue[currentIndex + 1];
-          print('🎵 Auto-playing next artist track: ${nextTrack.title}');
+          AppLogger.debug('🎵 Auto-playing next artist track: ${nextTrack.title}');
           await loadTrack(nextTrack);
           await play();
           return;
         }
         
         // Artist tracks exhausted, fallback to global queue
-        print('🎵 Artist tracks exhausted, falling back to global queue');
+        AppLogger.debug('🎵 Artist tracks exhausted, falling back to global queue');
         _playbackContext = PlaybackContext.globalQueue;
         _artistTracksExhausted = true;
         await _fetchMoreTracksForSection();
         if (currentIndex < _queue.length - 1) {
           final nextTrack = _queue[currentIndex + 1];
-          print('🎵 Auto-playing from global fallback: ${nextTrack.title}');
+          AppLogger.debug('🎵 Auto-playing from global fallback: ${nextTrack.title}');
           await loadTrack(nextTrack);
           await play();
           return;
@@ -291,7 +292,7 @@ class AudioPlayerState extends ChangeNotifier {
         // Check if we got new tracks
         if (currentIndex < _queue.length - 1) {
           final nextTrack = _queue[currentIndex + 1];
-          print('🎵 Auto-playing next track from fetched content: ${nextTrack.title}');
+          AppLogger.debug('🎵 Auto-playing next track from fetched content: ${nextTrack.title}');
           await loadTrack(nextTrack);
           await play();
           return;
@@ -299,7 +300,7 @@ class AudioPlayerState extends ChangeNotifier {
       }
       
       // No more tracks available - stop playing but keep track visible for replay
-      print('🎵 Queue ended, no more tracks available');
+      AppLogger.debug('🎵 Queue ended, no more tracks available');
       _isPlaying = false;
       // Don't clear _currentTrack - let the UI show replay option
       notifyListeners();
@@ -314,7 +315,7 @@ class AudioPlayerState extends ChangeNotifier {
     }
     
     try {
-      print('🎵 Fetching more tracks from creator ID: $_currentArtistId, skip: $_artistOffset');
+      AppLogger.debug('🎵 Fetching more tracks from creator ID: $_currentArtistId, skip: $_artistOffset');
       
       // Fetch podcasts by creator ID (user ID of the artist)
       final podcasts = await _api.getPodcastsByCreator(
@@ -334,14 +335,14 @@ class AudioPlayerState extends ChangeNotifier {
       if (newTracks.isNotEmpty) {
         _queue.addAll(newTracks);
         _artistOffset += newTracks.length;
-        print('🎵 Added ${newTracks.length} artist tracks to queue. Total queue size: ${_queue.length}');
+        AppLogger.debug('🎵 Added ${newTracks.length} artist tracks to queue. Total queue size: ${_queue.length}');
         notifyListeners();
       } else {
-        print('🎵 No more tracks available from artist');
+        AppLogger.debug('🎵 No more tracks available from artist');
         _artistTracksExhausted = true;
       }
     } catch (e) {
-      print('🎵 Error fetching artist tracks: $e');
+      AppLogger.debug('🎵 Error fetching artist tracks: $e');
       _artistTracksExhausted = true;
     }
   }
@@ -351,7 +352,7 @@ class AudioPlayerState extends ChangeNotifier {
     if (_currentSection == null) return;
     
     try {
-      print('🎵 Fetching more tracks from section: $_currentSection, skip: $_currentOffset');
+      AppLogger.debug('🎵 Fetching more tracks from section: $_currentSection, skip: $_currentOffset');
       
       List<ContentItem> newTracks = [];
       
@@ -386,10 +387,10 @@ class AudioPlayerState extends ChangeNotifier {
           // Music tracks are already loaded in memory via MusicProvider
           // For continuous music playback, we would need to implement
           // fetching from the music API endpoint if it exists
-          print('🎵 Music continuous fetching not implemented - using existing queue');
+          AppLogger.debug('🎵 Music continuous fetching not implemented - using existing queue');
           break;
         default:
-          print('🎵 Unknown section: $_currentSection');
+          AppLogger.debug('🎵 Unknown section: $_currentSection');
           return;
       }
       
@@ -399,13 +400,13 @@ class AudioPlayerState extends ChangeNotifier {
       if (validTracks.isNotEmpty) {
         _queue.addAll(validTracks);
         _currentOffset += validTracks.length;
-        print('🎵 Added ${validTracks.length} tracks to queue. Total queue size: ${_queue.length}');
+        AppLogger.debug('🎵 Added ${validTracks.length} tracks to queue. Total queue size: ${_queue.length}');
         notifyListeners();
       } else {
-        print('🎵 No more tracks available in section: $_currentSection');
+        AppLogger.debug('🎵 No more tracks available in section: $_currentSection');
       }
     } catch (e) {
-      print('🎵 Error fetching more tracks: $e');
+      AppLogger.debug('🎵 Error fetching more tracks: $e');
     }
   }
 

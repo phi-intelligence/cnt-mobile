@@ -11,6 +11,7 @@ import '../../models/content_item.dart';
 import '../../widgets/shared/loading_shimmer.dart';
 import '../../widgets/shared/empty_state.dart';
 import '../../widgets/mobile/content_card_mobile.dart';
+import '../../utils/app_logger.dart';
 
 class LibraryScreenMobile extends StatefulWidget {
   const LibraryScreenMobile({super.key});
@@ -29,7 +30,7 @@ class _LibraryScreenMobileState extends State<LibraryScreenMobile> {
   @override
   void initState() {
     super.initState();
-    print('✅ LibraryScreenMobile initState');
+    AppLogger.debug('✅ LibraryScreenMobile initState');
     _loadDownloads();
     // Fetch playlists and favorites on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,7 +39,7 @@ class _LibraryScreenMobileState extends State<LibraryScreenMobile> {
         context.read<PlaylistProvider>().fetchPlaylists();
         context.read<FavoritesProvider>().fetchFavorites();
       } catch (e) {
-        print('❌ LibraryScreenMobile: Error fetching playlists/favorites: $e');
+        AppLogger.debug('❌ LibraryScreenMobile: Error fetching playlists/favorites: $e');
       }
     });
   }
@@ -56,7 +57,7 @@ class _LibraryScreenMobileState extends State<LibraryScreenMobile> {
         });
       }
     } catch (e) {
-      print('❌ LibraryScreenMobile: Error loading downloads: $e');
+      AppLogger.debug('❌ LibraryScreenMobile: Error loading downloads: $e');
       if (mounted) {
         setState(() => _isLoadingDownloads = false);
       }

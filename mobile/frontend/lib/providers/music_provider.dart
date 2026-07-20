@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/content_item.dart';
 import '../models/api_models.dart';
+import '../utils/app_logger.dart';
 
 class MusicProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -64,10 +65,10 @@ class MusicProvider extends ChangeNotifier {
       }
       
       _error = null;
-      print('✅ Loaded ${_tracks.length} music tracks from API');
+      AppLogger.debug('✅ Loaded ${_tracks.length} music tracks from API');
     } catch (e) {
       _error = 'Failed to load music: $e';
-      print('❌ Error fetching tracks: $e');
+      AppLogger.debug('❌ Error fetching tracks: $e');
       _addMockData();
     } finally {
       _isLoading = false;
@@ -105,7 +106,7 @@ class MusicProvider extends ChangeNotifier {
         createdAt: track.createdAt,
       );
     } catch (e) {
-      print('Error fetching track: $e');
+      AppLogger.debug('Error fetching track: $e');
       return null;
     }
   }

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/content_item.dart';
 import '../models/api_models.dart';
+import '../utils/app_logger.dart';
 
 class SearchProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -32,7 +33,7 @@ class SearchProvider extends ChangeNotifier {
       _recentSearches = searches.take(10).toList();
       notifyListeners();
     } catch (e) {
-      print('Error loading recent searches: $e');
+      AppLogger.debug('Error loading recent searches: $e');
     }
   }
   
@@ -41,7 +42,7 @@ class SearchProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('recent_searches', _recentSearches);
     } catch (e) {
-      print('Error saving recent searches: $e');
+      AppLogger.debug('Error saving recent searches: $e');
     }
   }
   
@@ -163,7 +164,7 @@ class SearchProvider extends ChangeNotifier {
     } catch (e) {
       _error = 'Failed to fetch content: $e';
       _results = [];
-      print('Error fetching content by type: $e');
+      AppLogger.debug('Error fetching content by type: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -204,7 +205,7 @@ class SearchProvider extends ChangeNotifier {
       items.addAll(movies.map((m) => _api.movieToContentItem(m)));
       
     } catch (e) {
-      print('Error fetching all content: $e');
+      AppLogger.debug('Error fetching all content: $e');
     }
     
     // Sort by created date
@@ -241,7 +242,7 @@ class SearchProvider extends ChangeNotifier {
               ));
             }
           } catch (e) {
-            print('Error parsing podcast: $e');
+            AppLogger.debug('Error parsing podcast: $e');
           }
         }
       }
@@ -255,7 +256,7 @@ class SearchProvider extends ChangeNotifier {
               items.add(_api.movieToContentItem(movie));
             }
           } catch (e) {
-            print('Error parsing movie: $e');
+            AppLogger.debug('Error parsing movie: $e');
           }
         }
       }
@@ -283,12 +284,12 @@ class SearchProvider extends ChangeNotifier {
               ));
             }
           } catch (e) {
-            print('Error parsing music track: $e');
+            AppLogger.debug('Error parsing music track: $e');
           }
         }
       }
     } catch (e) {
-      print('Error parsing search results: $e');
+      AppLogger.debug('Error parsing search results: $e');
     }
     
     return items;

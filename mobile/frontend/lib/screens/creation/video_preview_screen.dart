@@ -10,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../widgets/shared/pill_text_field.dart';
 import '../../providers/draft_provider.dart';
 import '../editing/video_editor_screen.dart';
+import '../../utils/app_logger.dart';
 
 /// Video Preview Screen
 /// Shows recorded/uploaded video with playback and controls
@@ -110,7 +111,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
         _isInitializing = false;
       });
     } catch (e) {
-      print('Error initializing video player: $e');
+      AppLogger.debug('Error initializing video player: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'Failed to load video: ${e.toString()}';

@@ -23,6 +23,7 @@ import '../../screens/bible/bible_document_selector_screen.dart';
 import '../../screens/bible/pdf_viewer_screen.dart';
 import 'community_screen_mobile.dart';
 import '../../navigation/mobile_navigation.dart';
+import '../../utils/app_logger.dart';
 
 /// Popular Bible verses for the daily quote feature
 const List<Map<String, String>> _bibleVerses = [
@@ -76,7 +77,7 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
   @override
   void initState() {
     super.initState();
-    print('✅ HomeScreenMobile initState');
+    AppLogger.debug('✅ HomeScreenMobile initState');
     
     // Initialize ValueNotifier for scroll offset
     _scrollOffsetNotifier = ValueNotifier<double>(0.0);
@@ -85,7 +86,7 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       try {
-        print('✅ HomeScreenMobile: Fetching data...');
+        AppLogger.debug('✅ HomeScreenMobile: Fetching data...');
         // Start critical data first (podcasts for main content)
         _fetchPodcasts();
         
@@ -108,9 +109,9 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
           context.read<UserProvider>().fetchUser();
         });
         
-        print('✅ HomeScreenMobile: Data fetch initiated');
+        AppLogger.debug('✅ HomeScreenMobile: Data fetch initiated');
       } catch (e) {
-        print('❌ HomeScreenMobile: Error initializing providers: $e');
+        AppLogger.debug('❌ HomeScreenMobile: Error initializing providers: $e');
       }
     });
   }
@@ -212,9 +213,9 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
       _recentPodcasts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _recentPodcasts = _recentPodcasts.take(5).toList();
       
-      print('✅ Loaded ${_audioPodcasts.length} audio podcasts and ${_videoPodcasts.length} video podcasts');
+      AppLogger.debug('✅ Loaded ${_audioPodcasts.length} audio podcasts and ${_videoPodcasts.length} video podcasts');
     } catch (e) {
-      print('❌ Error fetching podcasts: $e');
+      AppLogger.debug('❌ Error fetching podcasts: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -239,9 +240,9 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
         return _api.movieToContentItem(movie);
       }).toList();
       
-      print('✅ Loaded ${_movies.length} movies');
+      AppLogger.debug('✅ Loaded ${_movies.length} movies');
     } catch (e) {
-      print('❌ Error fetching movies: $e');
+      AppLogger.debug('❌ Error fetching movies: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -266,7 +267,7 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
         });
       }
     } catch (e) {
-      print('❌ Error fetching bible stories: $e');
+      AppLogger.debug('❌ Error fetching bible stories: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -291,7 +292,7 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
         });
       }
     } catch (e) {
-      print('❌ Error fetching bible documents: $e');
+      AppLogger.debug('❌ Error fetching bible documents: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -316,9 +317,9 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
         return _api.movieToContentItem(movie);
       }).toList();
       
-      print('✅ Loaded ${_animatedBibleStories.length} animated Bible stories');
+      AppLogger.debug('✅ Loaded ${_animatedBibleStories.length} animated Bible stories');
     } catch (e) {
-      print('❌ Error fetching animated Bible stories: $e');
+      AppLogger.debug('❌ Error fetching animated Bible stories: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -1270,8 +1271,16 @@ class _HomeScreenMobileState extends State<HomeScreenMobile> {
                             },
                           ),
                           
-                          // Bottom padding for navigation bar
-                          const SizedBox(height: 100),
+                          Consumer<AudioPlayerState>(
+                            builder: (context, audioPlayer, _) {
+                              final playerClearance = audioPlayer.currentTrack != null
+                                  ? 80.0
+                                  : 0.0;
+                              return SizedBox(
+                                height: AppSpacing.large + playerClearance,
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),

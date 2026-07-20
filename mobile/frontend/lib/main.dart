@@ -1,51 +1,40 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'config/environment.dart';
 import 'navigation/app_router.dart';
 import 'services/push_notification_service.dart';
+import 'utils/app_logger.dart';
+import 'utils/security_hardening.dart';
 
 Future<void> main() async {
-  // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize environment configuration from .env file
+
   await Environment.initialize();
-  
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  
-  // Initialize Stripe
-  // TODO: Set STRIPE_PUBLISHABLE_KEY in .env file
-  // For now, using a placeholder that will be updated from backend
-  // The actual key will be validated when creating payment intent
-  const stripePublishableKey = String.fromEnvironment(
-    'STRIPE_PUBLISHABLE_KEY',
-    defaultValue: 'pk_test_51placeholder', // Placeholder
-  );
-  if (stripePublishableKey.isNotEmpty && stripePublishableKey.length > 20) {
-    Stripe.publishableKey = stripePublishableKey;
-    if (kDebugMode) {
-      debugPrint('   Stripe initialized');
+
+  if (!kDebugMode && !Environment.isDevelopment) {
+    if (await SecurityHardening.isDeviceCompromised()) {
+      SecurityHardening.blockSensitiveFeatures();
+      AppLogger.warning('Device integrity check failed — payments and admin disabled');
     }
   }
-  
-  // Initialize push notification service
+
+  await Firebase.initializeApp();
+
+  const stripePublishableKey = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
+  if (stripePublishableKey.isNotEmpty && stripePublishableKey.length > 20) {
+    Stripe.publishableKey = stripePublishableKey;
+    AppLogger.debug('Stripe initialized');
+  }
+
   final pushNotificationService = PushNotificationService();
   await pushNotificationService.initialize();
-  
-  // Subscribe to general topics
   await pushNotificationService.subscribeToTopic('live_streams');
   await pushNotificationService.subscribeToTopic('announcements');
-  
-  if (kDebugMode) {
-    debugPrint('🚀 CNT Mobile App Starting...');
-    debugPrint('   Environment: ${Environment.environment}');
-    debugPrint('   Firebase initialized');
-    debugPrint('   Push notifications enabled');
-  }
-  
+
+  AppLogger.debug('CNT Mobile App starting (env: ${Environment.environment})');
+
   runApp(const MyApp());
 }
 

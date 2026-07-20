@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
+import '../utils/api_error_utils.dart';
 import 'auth_service.dart';
+import '../utils/pinned_http_client.dart';
 
 class DonationService {
+  static final _httpClient = PinnedHttpClient.instance;
+
   final AuthService _authService = AuthService();
   
   /// Get API base URL from centralized Environment configuration
@@ -19,7 +23,7 @@ class DonationService {
       final headers = await _authService.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/donations/create-payment-intent'),
         headers: headers,
         body: jsonEncode({
@@ -41,7 +45,7 @@ class DonationService {
         }
       }
     } catch (e) {
-      throw Exception('Payment intent error: $e');
+      throw Exception(ApiErrorUtils.sanitizeForUser(e, fallback: 'Payment failed'));
     }
   }
   
@@ -50,7 +54,7 @@ class DonationService {
     try {
       final headers = await _authService.getAuthHeaders();
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/donations/confirm/$paymentIntentId'),
         headers: headers,
       ).timeout(const Duration(seconds: 30));
@@ -67,7 +71,7 @@ class DonationService {
         }
       }
     } catch (e) {
-      throw Exception('Confirmation error: $e');
+      throw Exception(ApiErrorUtils.sanitizeForUser(e, fallback: 'Confirmation failed'));
     }
   }
 
@@ -82,7 +86,7 @@ class DonationService {
       final headers = await _authService.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
       
-      final response = await http.post(
+      final response = await _httpClient.post(
         Uri.parse('$baseUrl/donations'),
         headers: headers,
         body: jsonEncode({
@@ -105,7 +109,7 @@ class DonationService {
         }
       }
     } catch (e) {
-      throw Exception('Donation error: $e');
+      throw Exception(ApiErrorUtils.sanitizeForUser(e, fallback: 'Donation failed'));
     }
   }
 }

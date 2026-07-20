@@ -4,6 +4,8 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../theme/app_spacing.dart';
+import '../widgets/admin/admin_guard.dart';
+import '../utils/security_hardening.dart';
 import 'user_login_screen.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'admin/admin_content_page.dart';
@@ -72,7 +74,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SecureScreen(
+      child: AdminGuard(
+      child: Scaffold(
       backgroundColor: const Color(0xFFF5F0E8),
       appBar: _buildAppBar(),
       body: IndexedStack(
@@ -80,6 +84,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: _pages,
       ),
       bottomNavigationBar: _buildBottomNavBar(),
+    ),
+    ),
     );
   }
 

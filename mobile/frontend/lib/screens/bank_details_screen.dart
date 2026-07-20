@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/shared/pill_text_field.dart';
+import '../utils/app_logger.dart';
 
 class BankDetailsScreen extends StatefulWidget {
   final bool isFromUpload;
@@ -50,7 +51,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading bank details: $e');
+      AppLogger.debug('Error loading bank details: $e');
     } finally {
       setState(() => _isLoading = false);
     }

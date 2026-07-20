@@ -6,6 +6,7 @@ import '../../theme/app_typography.dart';
 import '../../services/video_editing_service.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../utils/app_logger.dart';
 
 /// Video Editor Screen - Professional Video Editing UI
 /// Features: Trimming, audio editing, rotation
@@ -254,7 +255,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> with SingleTicker
         _trimStart,
         _trimEnd,
         onProgress: (progress) {
-          print('Trim progress: $progress%');
+          AppLogger.debug('Trim progress: $progress%');
         },
         onError: (error) {
           throw Exception(error);
@@ -317,7 +318,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> with SingleTicker
       final outputPath = await _editingService.removeAudioTrack(
         inputPath,
         onProgress: (progress) {
-          print('Remove audio progress: $progress%');
+          AppLogger.debug('Remove audio progress: $progress%');
         },
         onError: (error) {
           throw Exception(error);
@@ -411,7 +412,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> with SingleTicker
         inputPath,
         audioPath,
         onProgress: (progress) {
-          print('Add audio progress: $progress%');
+          AppLogger.debug('Add audio progress: $progress%');
         },
         onError: (error) {
           throw Exception(error);
@@ -485,9 +486,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> with SingleTicker
         _isPlaying = false;
       });
       
-      print('✓ Video player reloaded successfully with duration: ${_videoDuration.inSeconds}s');
+      AppLogger.debug('✓ Video player reloaded successfully with duration: ${_videoDuration.inSeconds}s');
     } catch (e) {
-      print('Error reloading player: $e');
+      AppLogger.debug('Error reloading player: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'Failed to reload video: $e';
@@ -668,7 +669,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> with SingleTicker
         inputPath,
         _rotation,
         onProgress: (progress) {
-          print('Rotate progress: $progress%');
+          AppLogger.debug('Rotate progress: $progress%');
         },
         onError: (error) {
           throw Exception(error);

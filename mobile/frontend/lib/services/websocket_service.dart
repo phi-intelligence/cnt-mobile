@@ -1,51 +1,64 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+
 import '../config/environment.dart';
+import '../utils/app_logger.dart';
+import 'auth_service.dart';
 
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
   factory WebSocketService() => _instance;
-  
+
   IO.Socket? _socket;
   bool _isConnected = false;
-  
-  // Stream controllers for different event types
-  final _liveStreamStartedController = StreamController<Map<String, dynamic>>.broadcast();
-  final _speakPermissionRequestedController = StreamController<Map<String, dynamic>>.broadcast();
-  
+  final AuthService _authService = AuthService();
+
+  final _liveStreamStartedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _speakPermissionRequestedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   WebSocketService._internal();
-  
+
   bool get isConnected => _isConnected;
-  
-  // Streams for listening to events
-  Stream<Map<String, dynamic>> get liveStreamStarted => _liveStreamStartedController.stream;
-  Stream<Map<String, dynamic>> get speakPermissionRequested => _speakPermissionRequestedController.stream;
-  
+
+  Stream<Map<String, dynamic>> get liveStreamStarted =>
+      _liveStreamStartedController.stream;
+  Stream<Map<String, dynamic>> get speakPermissionRequested =>
+      _speakPermissionRequestedController.stream;
+
   Future<void> connect() async {
     if (_isConnected) return;
     try {
-      // Use centralized Environment configuration for WebSocket URL
       final url = Environment.webSocketUrl;
-      _socket = IO.io(url, <String, dynamic>{
+      final token = await _authService.getToken();
+
+      final options = <String, dynamic>{
         'path': '/socket.io/',
         'transports': ['websocket'],
         'autoConnect': true,
         'forceNew': true,
-      });
+        if (token != null && token.isNotEmpty) 'auth': {'token': token},
+        if (token != null && token.isNotEmpty)
+          'extraHeaders': {'Authorization': 'Bearer $token'},
+      };
+
+      _socket = IO.io(url, options);
 
       _socket!.on('connect', (_) {
         _isConnected = true;
-        print('✅ WebSocket connected');
+        AppLogger.debug('WebSocket connected');
       });
       _socket!.on('disconnect', (_) {
         _isConnected = false;
-        print('❌ WebSocket disconnected');
+        AppLogger.debug('WebSocket disconnected');
       });
       _socket!.on('message', (data) {
         try {
           if (data is String) {
-            _handleMessage(json.decode(data));
+            _handleMessage(json.decode(data) as Map<String, dynamic>);
           } else if (data is Map<String, dynamic>) {
             _handleMessage(data);
           }
@@ -55,64 +68,63 @@ class WebSocketService {
         try {
           if (data is Map<String, dynamic>) {
             _liveStreamStartedController.add(data);
-            print('📺 Live stream started notification: $data');
           }
         } catch (e) {
-          print('Error handling live_stream_started: $e');
+          AppLogger.warning('Error handling live_stream_started', error: e);
         }
       });
       _socket!.on('speak_permission_requested', (data) {
         try {
           if (data is Map<String, dynamic>) {
             _speakPermissionRequestedController.add(data);
-            print('🎤 Speak permission requested: $data');
           }
         } catch (e) {
-          print('Error handling speak_permission_requested: $e');
+          AppLogger.warning('Error handling speak_permission_requested', error: e);
         }
       });
       _socket!.on('error', (_) {
         _isConnected = false;
       });
-    } catch (_) {
+    } catch (e) {
       _isConnected = false;
+      AppLogger.error('WebSocket connection failed', error: e);
     }
   }
-  
+
   void disconnect() {
     _socket?.disconnect();
     _socket?.dispose();
     _isConnected = false;
     _socket = null;
-    _liveStreamStartedController.close();
-    _speakPermissionRequestedController.close();
   }
-  
+
+  /// Reconnect with a fresh auth token (e.g. after login).
+  Future<void> reconnect() async {
+    disconnect();
+    await connect();
+  }
+
   void send(Map<String, dynamic> data) {
     if (!_isConnected || _socket == null) {
-      print('WebSocket not connected - message not sent');
+      AppLogger.debug('WebSocket not connected - message not sent');
       return;
     }
-    
+
     try {
       _socket!.emit('message', data);
     } catch (e) {
-      print('Error sending WebSocket message: $e');
+      AppLogger.error('Error sending WebSocket message', error: e);
       _isConnected = false;
       _socket = null;
     }
   }
-  
+
   void _handleMessage(Map<String, dynamic> data) {
-    // Handle incoming WebSocket messages
-    print('WebSocket message: $data');
-    // TODO: Notify listeners based on message type
+    AppLogger.debug('WebSocket message received');
   }
-  
-  // Stream listener for specific events
+
   Stream<String> listenToEvent(String eventType) {
     if (_socket == null) return const Stream.empty();
     return const Stream.empty();
   }
 }
-

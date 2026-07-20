@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../utils/app_logger.dart';
 
 class UserProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -25,7 +26,7 @@ class UserProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to load user: $e';
-      print('Error fetching user: $e');
+      AppLogger.debug('Error fetching user: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -1,6 +1,7 @@
 import 'package:livekit_client/livekit_client.dart' as lk;
 import 'api_service.dart';
 import 'dart:async';
+import '../utils/app_logger.dart';
 
 /// Response model for meeting join token
 class MeetingJoinResponse {
@@ -156,23 +157,23 @@ class LiveKitMeetingService {
 
     _listener!
       ..on<lk.ParticipantConnectedEvent>((event) {
-        print('👥 LiveKit: Participant connected: ${event.participant.identity}');
+        AppLogger.debug('👥 LiveKit: Participant connected: ${event.participant.identity}');
         _updateParticipants();
       })
       ..on<lk.ParticipantDisconnectedEvent>((event) {
-        print('👥 LiveKit: Participant disconnected: ${event.participant.identity}');
+        AppLogger.debug('👥 LiveKit: Participant disconnected: ${event.participant.identity}');
         _updateParticipants();
       })
       ..on<lk.TrackSubscribedEvent>((event) {
-        print('📹 LiveKit: Track subscribed: ${event.track.kind}');
+        AppLogger.debug('📹 LiveKit: Track subscribed: ${event.track.kind}');
         _updateParticipants();
       })
       ..on<lk.TrackUnsubscribedEvent>((event) {
-        print('📹 LiveKit: Track unsubscribed: ${event.track.kind}');
+        AppLogger.debug('📹 LiveKit: Track unsubscribed: ${event.track.kind}');
         _updateParticipants();
       })
       ..on<lk.RoomDisconnectedEvent>((_) {
-        print('🔌 LiveKit: Room disconnected');
+        AppLogger.debug('🔌 LiveKit: Room disconnected');
         _isConnected = false;
         _connectionStateController.add(lk.ConnectionState.disconnected);
       });
@@ -208,7 +209,7 @@ class LiveKitMeetingService {
       _isConnected = false;
       _connectionStateController.add(lk.ConnectionState.disconnected);
     } catch (e) {
-      print('❌ LiveKit: Error leaving meeting: $e');
+      AppLogger.debug('❌ LiveKit: Error leaving meeting: $e');
     }
   }
 

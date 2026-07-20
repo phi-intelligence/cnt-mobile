@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../screens/bank_details_screen.dart';
 import '../theme/app_colors.dart';
+import '../utils/app_logger.dart';
 
 /// Helper function to check if user has bank details
 /// Bank details are OPTIONAL - user can publish without them
@@ -74,7 +75,7 @@ Future<bool> checkBankDetailsAndNavigate(BuildContext context) async {
     
     return true;
   } catch (e) {
-    print('Error checking bank details: $e');
+    AppLogger.debug('Error checking bank details: $e');
     // Return true on error - don't block publishing
     return true;
   }

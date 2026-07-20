@@ -10,6 +10,8 @@ import '../../widgets/meeting/pip_meeting_overlay.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
+import '../../utils/app_logger.dart';
+import '../../utils/security_hardening.dart';
 
 /// Meeting Room Screen - LiveKit meeting UI
 /// Custom UI built on top of LiveKit SDK
@@ -221,7 +223,7 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
       if (room.connectionState == lk.ConnectionState.connected) {
         // Additional check: ensure local participant is in the room
         if (room.localParticipant != null) {
-          print('✅ Room connection verified - host is connected');
+          AppLogger.debug('✅ Room connection verified - host is connected');
           return;
         }
       }
@@ -233,7 +235,7 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
     
     // If we reach here, connection verification timed out
     // Log warning but proceed anyway (room might still be connecting)
-    print('⚠️ Room connection verification timed out, proceeding with notification');
+    AppLogger.debug('⚠️ Room connection verification timed out, proceeding with notification');
   }
   
   /// Notify backend that host has joined the room.
@@ -242,7 +244,7 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   Future<void> _notifyHostJoined() async {
     // Prevent duplicate notifications
     if (_hostJoinedNotificationSent) {
-      print('ℹ️ Host joined notification already sent, skipping');
+      AppLogger.debug('ℹ️ Host joined notification already sent, skipping');
       return;
     }
     
@@ -252,13 +254,13 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
       if (meetingIdInt != null) {
         _hostJoinedNotificationSent = true; // Set flag before API call
         await api.notifyHostJoined(meetingIdInt);
-        print('✅ Host joined notification sent for meeting: ${widget.meetingId}');
+        AppLogger.debug('✅ Host joined notification sent for meeting: ${widget.meetingId}');
       }
     } catch (e) {
       // Don't fail the meeting if notification fails
       // Reset flag to allow retry on next opportunity
       _hostJoinedNotificationSent = false;
-      print('⚠️ Failed to send host joined notification: $e');
+      AppLogger.debug('⚠️ Failed to send host joined notification: $e');
     }
   }
 
@@ -709,10 +711,10 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
       final meetingIdInt = int.tryParse(widget.meetingId);
       if (meetingIdInt != null) {
         await ApiService().endMeeting(meetingIdInt);
-        print('✅ Meeting ended for all participants: ${widget.meetingId}');
+        AppLogger.debug('✅ Meeting ended for all participants: ${widget.meetingId}');
       }
     } catch (e) {
-      print('⚠️ Failed to end meeting on server: $e');
+      AppLogger.debug('⚠️ Failed to end meeting on server: $e');
       // Continue with local cleanup even if server call fails
     }
     await _leaveMeetingCompletely();
@@ -763,6 +765,10 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return SecureScreen(child: _buildMeetingContent(context));
+  }
+
+  Widget _buildMeetingContent(BuildContext context) {
     if (_joining) {
       return Scaffold(
         backgroundColor: _meetingBackgroundDark,
