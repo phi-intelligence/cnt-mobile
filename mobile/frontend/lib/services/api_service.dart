@@ -2294,6 +2294,58 @@ class ApiService {
       _throwOperationError('Error rejecting content', e);
     }
   }
+
+  Future<bool> deleteAdminContent(String contentType, int contentId) async {
+    try {
+      final response = await _httpClient.delete(
+        Uri.parse('$baseUrl/admin/$contentType/$contentId'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      _throwOperationError('Error deleting content', e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getCommissionSettings() async {
+    try {
+      final response = await _httpClient.get(
+        Uri.parse('$baseUrl/admin/settings/commission'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 403) {
+        throw Exception('Forbidden: Admin access required.');
+      }
+      _throwHttpFailure('Failed to get commission settings', response.statusCode, body: response.body);
+    } catch (e) {
+      _throwOperationError('Error fetching commission settings', e);
+    }
+  }
+
+  Future<Map<String, dynamic>> updateCommissionSettings(
+    Map<String, dynamic> settings,
+  ) async {
+    try {
+      final response = await _httpClient.put(
+        Uri.parse('$baseUrl/admin/settings/commission'),
+        headers: await _getHeaders(),
+        body: json.encode(settings),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 403) {
+        throw Exception('Forbidden: Admin access required.');
+      }
+      _throwHttpFailure('Failed to update commission settings', response.statusCode, body: response.body);
+    } catch (e) {
+      _throwOperationError('Error updating commission settings', e);
+    }
+  }
   
   Future<List<dynamic>> getAllContent({
     String? contentType,

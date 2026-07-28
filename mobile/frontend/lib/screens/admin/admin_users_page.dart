@@ -4,6 +4,8 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import '../../widgets/shared/pill_text_field.dart';
 import '../../widgets/shared/empty_state.dart';
+import '../../widgets/admin/admin_filter_chips.dart';
+import '../../widgets/admin/admin_page_scaffold.dart';
 
 /// Redesigned Users management page with cream/brown theme
 class AdminUsersPage extends StatefulWidget {
@@ -24,8 +26,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
   List<dynamic> _users = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   String? _error;
   String _selectedFilter = 'All';
+
+  static const _pageSize = 50;
 
   final List<String> _filters = ['All', 'Admins', 'Artists', 'Regular'];
 
@@ -41,18 +47,31 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     super.dispose();
   }
 
-  Future<void> _fetchUsers() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _fetchUsers({bool loadMore = false}) async {
+    if (loadMore) {
+      if (!_hasMore || _isLoadingMore) return;
+      setState(() => _isLoadingMore = true);
+    } else {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+        _hasMore = true;
+      });
+    }
 
     try {
-      final users = await _api.getUsers();
+      final skip = loadMore ? _users.length : 0;
+      final users = await _api.getUsers(skip: skip, limit: _pageSize);
       if (mounted) {
         setState(() {
-          _users = users;
+          if (loadMore) {
+            _users.addAll(users);
+          } else {
+            _users = users;
+          }
+          _hasMore = users.length >= _pageSize;
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
@@ -60,6 +79,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         setState(() {
           _error = e.toString();
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -103,8 +123,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF5F0E8),
+    return AdminPageScaffold(
       child: Column(
         children: [
           _buildHeader(),
@@ -274,12 +293,32 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchUsers,
+      onRefresh: () => _fetchUsers(),
       color: AppColors.warmBrown,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: filteredUsers.length,
+        itemCount: filteredUsers.length +
+            (_hasMore &&
+                    _selectedFilter == 'All' &&
+                    _searchController.text.isEmpty
+                ? 1
+                : 0),
         itemBuilder: (context, index) {
+          if (index >= filteredUsers.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: _isLoadingMore
+                    ? const CircularProgressIndicator(
+                        color: AppColors.warmBrown,
+                      )
+                    : TextButton(
+                        onPressed: () => _fetchUsers(loadMore: true),
+                        child: const Text('Load more users'),
+                      ),
+              ),
+            );
+          }
           return _buildUserCard(filteredUsers[index]);
         },
       ),

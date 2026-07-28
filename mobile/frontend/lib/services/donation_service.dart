@@ -248,6 +248,42 @@ class DonationService {
     }
   }
 
+  Future<DonationHistoryPage> listAllAdmin({
+    int limit = 50,
+    int offset = 0,
+    String? statusFilter,
+  }) async {
+    try {
+      final headers = await _authService.getAuthHeaders();
+      final queryParameters = <String, String>{
+        'limit': '$limit',
+        'offset': '$offset',
+      };
+      if (statusFilter != null && statusFilter.isNotEmpty) {
+        queryParameters['status_filter'] = statusFilter;
+      }
+
+      final uri = Uri.parse('$baseUrl/donations/admin/all').replace(
+        queryParameters: queryParameters,
+      );
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        return DonationHistoryPage.fromJson(
+          json.decode(response.body) as Map<String, dynamic>,
+        );
+      }
+
+      throw DonationServiceException(_parseErrorMessage(response));
+    } catch (e) {
+      if (e is DonationServiceException) rethrow;
+      AppLogger.error('Error loading admin donations', error: e);
+      throw const DonationServiceException('Failed to load donations');
+    }
+  }
+
   String _parseErrorMessage(http.Response response) {
     final body = response.body;
     try {

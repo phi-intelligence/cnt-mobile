@@ -31,9 +31,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ),
     AdminContentPage(
       initialFilter: _initialContentFilter,
+      initialTabIndex: _initialContentTabIndex,
       onFilterApplied: () {
-        // Reset the filter after it's been applied
         _initialContentFilter = null;
+        _initialContentTabIndex = null;
       },
     ),
     AdminUsersPage(
@@ -42,12 +43,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     AdminToolsPage(),
   ];
 
-  void _navigateToTab(int index, {String? contentFilter}) {
+  void _navigateToTab(int index, {String? contentFilter, int? contentTabIndex}) {
     setState(() {
       _initialContentFilter = contentFilter;
+      _initialContentTabIndex = contentTabIndex;
       _currentIndex = index;
     });
   }
+
+  int? _initialContentTabIndex;
 
   final List<_NavItem> _navItems = const [
     _NavItem(
@@ -77,7 +81,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return SecureScreen(
       child: AdminGuard(
       child: Scaffold(
-      backgroundColor: const Color(0xFFF5F0E8),
+      backgroundColor: AppColors.backgroundPrimary,
       appBar: _buildAppBar(),
       body: IndexedStack(
         index: _currentIndex,
@@ -157,7 +161,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ],
           onSelected: (value) {
-            if (value == 'logout') {
+            if (value == 'profile') {
+              Navigator.of(context).pop();
+            } else if (value == 'logout') {
               _handleLogout();
             }
           },
@@ -168,79 +174,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            offset: const Offset(0, -2),
-            blurRadius: 8,
-          ),
-        ],
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (index) {
-              final item = _navItems[index];
-              final isActive = _currentIndex == index;
-              
-              return _buildNavItem(
-                item: item,
-                isActive: isActive,
-                onTap: () => setState(() => _currentIndex = index),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 360;
 
-  Widget _buildNavItem({
-    required _NavItem item,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(
-          horizontal: isActive ? 16 : 12,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.warmBrown.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isActive ? item.activeIcon : item.icon,
-              color: isActive ? AppColors.warmBrown : AppColors.textSecondary,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: AppTypography.caption.copyWith(
-                color: isActive ? AppColors.warmBrown : AppColors.textSecondary,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 11,
+    return NavigationBarTheme(
+      data: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: AppColors.warmBrown.withValues(alpha: 0.15),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return AppTypography.caption.copyWith(
+            fontSize: compact ? 10 : 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected ? AppColors.warmBrown : AppColors.textSecondary,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? AppColors.warmBrown : AppColors.textSecondary,
+            size: 22,
+          );
+        }),
+      ),
+      child: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        labelBehavior: compact
+            ? NavigationDestinationLabelBehavior.onlyShowSelected
+            : NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: _navItems
+            .map(
+              (item) => NavigationDestination(
+                icon: Icon(item.icon),
+                selectedIcon: Icon(item.activeIcon),
+                label: item.label,
+                tooltip: item.label,
               ),
-            ),
-          ],
-        ),
+            )
+            .toList(),
       ),
     );
   }

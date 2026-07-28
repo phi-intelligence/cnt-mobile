@@ -56,6 +56,8 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
 }
 
 /// Audio management page for approving/rejecting audio podcasts
+/// Deprecated — use [AdminContentPage] instead.
+@Deprecated('Use AdminContentPage')
 class AdminAudioPage extends StatefulWidget {
   const AdminAudioPage({super.key});
 

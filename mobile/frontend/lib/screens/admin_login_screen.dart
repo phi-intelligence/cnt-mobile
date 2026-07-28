@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../navigation/mobile_navigation.dart';
 import '../utils/security_hardening.dart';
-import 'admin_dashboard.dart';
 
+/// Deprecated admin login — admins use the standard UserLoginScreen.
+@Deprecated('Use UserLoginScreen; admin access is determined by is_admin from API')
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 

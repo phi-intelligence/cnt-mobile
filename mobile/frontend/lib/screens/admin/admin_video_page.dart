@@ -8,6 +8,7 @@ import '../../widgets/admin/admin_button.dart';
 import '../../widgets/shared/empty_state.dart';
 
 /// Video management page for approving/rejecting video podcasts and movies
+@Deprecated('Use AdminContentPage')
 class AdminVideoPage extends StatefulWidget {
   const AdminVideoPage({super.key});
 

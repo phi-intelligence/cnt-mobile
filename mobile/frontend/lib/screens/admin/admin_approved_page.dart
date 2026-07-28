@@ -9,6 +9,7 @@ import '../../utils/app_logger.dart';
 
 /// Admin Approved Page - Shows all approved content with tabs
 /// Tabs: All, Podcasts, Movies, Posts
+@Deprecated('Use AdminContentPage')
 class AdminApprovedPage extends StatefulWidget {
   final int initialTabIndex;
 

@@ -1,42 +1,32 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
+import '../../widgets/admin/admin_page_scaffold.dart';
+import '../../widgets/admin/admin_section_header.dart';
 import 'admin_support_page.dart';
 import 'admin_documents_page.dart';
+import 'admin_commission_settings_page.dart';
+import 'admin_donations_page.dart';
 import 'bulk_upload_screen.dart';
+import 'google_drive_picker_screen.dart';
 
-/// Admin Tools Page - Hub for admin utilities
-/// Contains: Bulk Upload, Documents, Support Tickets
+/// Admin Tools Page - Hub for admin utilities.
 class AdminToolsPage extends StatelessWidget {
   const AdminToolsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF5F0E8),
+    return AdminPageScaffold(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Text(
-              'Admin Tools',
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+            const AdminSectionHeader(
+              title: 'Admin Tools',
+              subtitle: 'Manage content, documents, payments, and support',
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Manage content, documents, and support',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Content Management Section
+            const SizedBox(height: 16),
             _buildSectionHeader('Content Management', Icons.content_paste),
             const SizedBox(height: 12),
             _buildToolCard(
@@ -62,9 +52,49 @@ class AdminToolsPage extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const AdminDocumentsPage()),
               ),
             ),
+            const SizedBox(height: 12),
+            _buildToolCard(
+              context: context,
+              icon: Icons.drive_folder_upload,
+              title: 'Google Drive Import',
+              description: 'Import media from Google Drive',
+              color: const Color(0xFF4285F4),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const GoogleDrivePickerScreen(),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
-
-            // Support Section
+            _buildSectionHeader('Payments', Icons.payments_outlined),
+            const SizedBox(height: 12),
+            _buildToolCard(
+              context: context,
+              icon: Icons.percent,
+              title: 'Commission Settings',
+              description: 'Configure platform donation commission',
+              color: const Color(0xFF8B5CF6),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminCommissionSettingsPage(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildToolCard(
+              context: context,
+              icon: Icons.volunteer_activism,
+              title: 'All Donations',
+              description: 'View all platform donations',
+              color: const Color(0xFFEC4899),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminDonationsPage()),
+              ),
+            ),
+            const SizedBox(height: 24),
             _buildSectionHeader('Support', Icons.support_agent),
             const SizedBox(height: 12),
             _buildToolCard(
@@ -78,7 +108,6 @@ class AdminToolsPage extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const AdminSupportPage()),
               ),
             ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -88,16 +117,8 @@ class AdminToolsPage extends StatelessWidget {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.warmBrown.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 18, color: AppColors.warmBrown),
-        ),
-        const SizedBox(width: 10),
+        Icon(icon, size: 20, color: AppColors.warmBrown),
+        const SizedBox(width: 8),
         Text(
           title,
           style: AppTypography.bodyMedium.copyWith(
@@ -117,60 +138,53 @@ class AdminToolsPage extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTypography.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: AppColors.textSecondary.withOpacity(0.5),
-            ),
-          ],
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -4,14 +4,19 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/shared/empty_state.dart';
+import '../../widgets/admin/admin_page_scaffold.dart';
+import '../../widgets/admin/admin_stat_grid.dart';
+import '../../widgets/admin/admin_section_header.dart';
 import 'admin_support_page.dart';
 import 'admin_documents_page.dart';
-import 'admin_pending_page.dart';
+import 'admin_commission_settings_page.dart';
+import 'admin_donations_page.dart';
 
 /// Dashboard page showing overview statistics and quick actions
 /// Redesigned with cream/brown theme and cleaner layout
 class AdminDashboardPage extends StatefulWidget {
-  final void Function(int index, {String? contentFilter})? onNavigateToTab;
+  final void Function(int index, {String? contentFilter, int? contentTabIndex})?
+      onNavigateToTab;
 
   const AdminDashboardPage({
     super.key,
@@ -60,13 +65,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF5F0E8),
-      child: _buildContent(),
+    return AdminPageScaffold(
+      onRefresh: _loadStats,
+      child: _buildContentInner(),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContentInner() {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -89,7 +94,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     if (_error != null) {
-      return _buildErrorState();
+      return AdminErrorState(
+        title: 'Error loading dashboard',
+        message: _error!,
+        onRetry: _loadStats,
+      );
     }
 
     if (_stats == null) {
@@ -100,10 +109,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadStats,
-      color: AppColors.warmBrown,
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -119,63 +125,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             const SizedBox(height: 32),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.errorMain.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.error_outline,
-                size: 40,
-                color: AppColors.errorMain,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Error loading dashboard',
-              style: AppTypography.heading3.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadStats,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warmBrown,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      );
   }
 
   Widget _buildWelcomeCard() {
@@ -244,41 +194,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(height: 20),
           Row(
             children: [
-              InkWell(
-                onTap: _calculateTotalPending() > 0
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AdminPendingPage(),
-                          ),
-                        );
-                      }
-                    : null,
-                borderRadius: BorderRadius.circular(12),
-                child: _buildWelcomeStat(
-                label: 'Pending',
-                value: _calculateTotalPending().toString(),
-                icon: Icons.pending_actions,
+              Expanded(
+                child: InkWell(
+                  onTap: _calculateTotalPending() > 0
+                      ? () => widget.onNavigateToTab?.call(
+                            1,
+                            contentTabIndex: 0,
+                          )
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _buildWelcomeStat(
+                    label: 'Pending',
+                    value: _calculateTotalPending().toString(),
+                    icon: Icons.pending_actions,
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
-              InkWell(
-                onTap: (_stats?['open_support_tickets'] ?? 0) > 0
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AdminSupportPage(),
-                          ),
-                        );
-                      }
-                    : null,
-                borderRadius: BorderRadius.circular(12),
-                child: _buildWelcomeStat(
-                label: 'Support',
-                value: (_stats?['open_support_tickets'] ?? 0).toString(),
-                icon: Icons.support_agent,
+              const SizedBox(width: 12),
+              Expanded(
+                child: InkWell(
+                  onTap: (_stats?['open_support_tickets'] ?? 0) > 0
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminSupportPage(),
+                            ),
+                          );
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _buildWelcomeStat(
+                    label: 'Support',
+                    value: (_stats?['open_support_tickets'] ?? 0).toString(),
+                    icon: Icons.support_agent,
+                  ),
                 ),
               ),
             ],
@@ -293,18 +243,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String value,
     required IconData icon,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Column(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -313,17 +264,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   label,
                   style: AppTypography.caption.copyWith(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -332,100 +287,51 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quick Stats',
-          style: AppTypography.heading3.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        const AdminSectionHeader(title: 'Quick Stats'),
         const SizedBox(height: 12),
-        Row(
+        AdminStatGrid(
           children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.podcasts,
-                label: 'Podcasts',
-                value: (_stats?['total_podcasts'] ?? 0).toString(),
-                color: const Color(0xFF6366F1),
-                onTap: () {
-                  // Navigate to Content tab with Audio filter
-                  widget.onNavigateToTab?.call(1, contentFilter: 'Audio');
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.podcasts,
+              label: 'Podcasts',
+              value: (_stats?['total_podcasts'] ?? 0).toString(),
+              color: const Color(0xFF6366F1),
+              onTap: () => widget.onNavigateToTab?.call(1, contentFilter: 'Podcasts'),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.movie,
-                label: 'Movies',
-                value: (_stats?['total_movies'] ?? 0).toString(),
-                color: const Color(0xFF8B5CF6),
-                onTap: () {
-                  // Navigate to Content tab with Movies filter
-                  widget.onNavigateToTab?.call(1, contentFilter: 'Movies');
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.movie,
+              label: 'Movies',
+              value: (_stats?['total_movies'] ?? 0).toString(),
+              color: const Color(0xFF8B5CF6),
+              onTap: () => widget.onNavigateToTab?.call(1, contentFilter: 'Movies'),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.library_music,
-                label: 'Music',
-                value: (_stats?['total_music'] ?? 0).toString(),
-                color: const Color(0xFF10B981),
-                onTap: () {
-                  // Navigate to Content tab (Music content)
-                  widget.onNavigateToTab?.call(1, contentFilter: 'All');
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.library_music,
+              label: 'Music',
+              value: (_stats?['total_music'] ?? 0).toString(),
+              color: const Color(0xFF10B981),
+              onTap: () => widget.onNavigateToTab?.call(1, contentFilter: 'Music'),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.article,
-                label: 'Posts',
-                value: (_stats?['total_posts'] ?? 0).toString(),
-                color: const Color(0xFFF59E0B),
-                onTap: () {
-                  // Navigate to Content tab with Posts filter
-                  widget.onNavigateToTab?.call(1, contentFilter: 'Posts');
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.article,
+              label: 'Posts',
+              value: (_stats?['total_posts'] ?? 0).toString(),
+              color: const Color(0xFFF59E0B),
+              onTap: () => widget.onNavigateToTab?.call(1, contentFilter: 'Posts'),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.people,
-                label: 'Total Users',
-                value: (_stats?['total_users'] ?? 0).toString(),
-                color: AppColors.warmBrown,
-                onTap: () {
-                  // Navigate to Users tab
-                  widget.onNavigateToTab?.call(2);
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.people,
+              label: 'Total Users',
+              value: (_stats?['total_users'] ?? 0).toString(),
+              color: AppColors.warmBrown,
+              onTap: () => widget.onNavigateToTab?.call(2),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.videocam,
-                label: 'Video',
-                value: (_stats?['video_podcasts'] ?? _stats?['total_videos'] ?? 0).toString(),
-                color: const Color(0xFFEC4899),
-                onTap: () {
-                  // Navigate to Content tab with Video filter
-                  widget.onNavigateToTab?.call(1, contentFilter: 'Video');
-                },
-              ),
+            _buildStatCard(
+              icon: Icons.videocam,
+              label: 'Video',
+              value: (_stats?['video_podcasts'] ?? _stats?['total_videos'] ?? 0).toString(),
+              color: const Color(0xFFEC4899),
+              onTap: () => widget.onNavigateToTab?.call(1, contentFilter: 'Podcasts'),
             ),
           ],
         ),
@@ -505,7 +411,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final pendingMovies = _stats?['pending_movies'] ?? 0;
     final pendingMusic = _stats?['pending_music'] ?? 0;
     final pendingPosts = _stats?['pending_posts'] ?? 0;
-    final totalPending = pendingPodcasts + pendingMovies + pendingMusic + pendingPosts;
+    final pendingEvents = _stats?['pending_events'] ?? 0;
+    final totalPending = pendingPodcasts +
+        pendingMovies +
+        pendingMusic +
+        pendingPosts +
+        pendingEvents;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -570,32 +481,29 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildPendingItem('Podcasts', pendingPodcasts, Icons.podcasts),
-          _buildPendingItem('Movies', pendingMovies, Icons.movie),
-          _buildPendingItem('Music', pendingMusic, Icons.library_music),
-          _buildPendingItem('Posts', pendingPosts, Icons.article),
+          _buildPendingItem('Podcasts', pendingPodcasts, Icons.podcasts, 'Podcasts'),
+          _buildPendingItem('Movies', pendingMovies, Icons.movie, 'Movies'),
+          _buildPendingItem('Music', pendingMusic, Icons.library_music, 'Music'),
+          _buildPendingItem('Posts', pendingPosts, Icons.article, 'Posts'),
+          _buildPendingItem('Events', pendingEvents, Icons.event, 'Events'),
         ],
       ),
     );
   }
 
-  Widget _buildPendingItem(String label, int count, IconData icon) {
+  Widget _buildPendingItem(
+    String label,
+    int count,
+    IconData icon,
+    String contentFilter,
+  ) {
     return InkWell(
       onTap: count > 0
-          ? () {
-              // Navigate to pending page with appropriate tab
-              int tabIndex = 0;
-              if (label == 'Podcasts') tabIndex = 1;
-              else if (label == 'Movies') tabIndex = 2;
-              else if (label == 'Posts') tabIndex = 3;
-              
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminPendingPage(initialTabIndex: tabIndex),
-                ),
-              );
-            }
+          ? () => widget.onNavigateToTab?.call(
+                1,
+                contentFilter: contentFilter,
+                contentTabIndex: 0,
+              )
           : null,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
@@ -690,6 +598,34 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const AdminSupportPage()),
+                  );
+                },
+              ),
+              const Divider(height: 24),
+              _buildOverviewRow(
+                'Commission Settings',
+                'Configure',
+                Icons.percent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminCommissionSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 24),
+              _buildOverviewRow(
+                'All Donations',
+                'View',
+                Icons.volunteer_activism,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminDonationsPage(),
+                    ),
                   );
                 },
               ),

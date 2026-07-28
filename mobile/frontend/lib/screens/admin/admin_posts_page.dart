@@ -8,6 +8,7 @@ import '../../widgets/admin/admin_button.dart';
 import '../../widgets/shared/empty_state.dart';
 
 /// Posts management page for approving/rejecting community posts
+@Deprecated('Use AdminContentPage')
 class AdminPostsPage extends StatefulWidget {
   const AdminPostsPage({super.key});
 

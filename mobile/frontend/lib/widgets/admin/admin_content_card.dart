@@ -12,6 +12,7 @@ class AdminContentCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback? onDelete;
   final VoidCallback? onTap;
   final bool isSelected;
   final ValueChanged<bool>? onSelectionChanged;
@@ -21,6 +22,7 @@ class AdminContentCard extends StatelessWidget {
     required this.item,
     this.onApprove,
     this.onReject,
+    this.onDelete,
     this.onTap,
     this.isSelected = false,
     this.onSelectionChanged,
@@ -36,6 +38,8 @@ class AdminContentCard extends StatelessWidget {
         return '🎵';
       case 'community_post':
         return '📝';
+      case 'event':
+        return '📅';
       default:
         return '📄';
     }
@@ -186,11 +190,18 @@ class AdminContentCard extends StatelessWidget {
               ),
 
               // Actions
-              if (onApprove != null || onReject != null) ...[
+              if (onApprove != null || onReject != null || onDelete != null) ...[
                 const SizedBox(width: AppSpacing.small),
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (onDelete != null)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        color: AppColors.errorMain,
+                        onPressed: onDelete,
+                        tooltip: 'Delete',
+                      ),
                     if (onReject != null)
                       IconButton(
                         icon: const Icon(Icons.close),

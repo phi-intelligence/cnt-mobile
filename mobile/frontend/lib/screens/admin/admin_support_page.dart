@@ -105,7 +105,7 @@ class _AdminSupportPageState extends State<AdminSupportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E8),
+      backgroundColor: AppColors.backgroundPrimary,
       appBar: AppBar(
         backgroundColor: AppColors.warmBrown,
         elevation: 0,

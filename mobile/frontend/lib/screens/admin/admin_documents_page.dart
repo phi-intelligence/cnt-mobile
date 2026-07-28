@@ -95,7 +95,7 @@ class _AdminDocumentsPageState extends State<AdminDocumentsPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: const Color(0xFFF5F0E8),
+        backgroundColor: AppColors.backgroundPrimary,
         title: Text(
           'Delete Document',
           style: AppTypography.heading3.copyWith(
@@ -142,7 +142,7 @@ class _AdminDocumentsPageState extends State<AdminDocumentsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E8),
+      backgroundColor: AppColors.backgroundPrimary,
       appBar: AppBar(
         backgroundColor: AppColors.warmBrown,
         elevation: 0,
