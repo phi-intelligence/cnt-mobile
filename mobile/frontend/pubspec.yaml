@@ -115,9 +115,12 @@ flutter:
   #       - asset: assets/fonts/Inter-Bold.ttf
   #         weight: 700
 
+# Launcher icons are installed from IconKitchen output under android/res and
+# ios/Runner/Assets.xcassets/AppIcon.appiconset (do not run launcher_icons
+# unless regenerating from assets/images/icon.png).
 flutter_launcher_icons:
-  android: true
-  ios: true
+  android: false
+  ios: false
   image_path: "assets/images/icon.png"
   min_sdk_android: 21
   remove_alpha_ios: true

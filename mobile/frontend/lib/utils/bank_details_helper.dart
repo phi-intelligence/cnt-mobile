@@ -1,82 +1,146 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../screens/bank_details_screen.dart';
+
+import '../providers/creator_provider.dart';
+import '../services/donation_service.dart';
+import '../screens/donation_modal.dart';
+import '../config/environment.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_typography.dart';
 import '../utils/app_logger.dart';
 
-/// Helper function to check if user has bank details
-/// Bank details are OPTIONAL - user can publish without them
-/// Shows informational message if missing, but allows publishing
-/// When bank details are missing, donations default to admin account
+/// Prefer hard creator gate before create; kept as a fallback if status is stale.
 Future<bool> checkBankDetailsAndNavigate(BuildContext context) async {
-  final userProvider = Provider.of<UserProvider>(context, listen: false);
-  
+  return context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+}
+
+/// Check if recipient can accept donations via Paystack creator payout.
+Future<bool> checkRecipientBankDetails(int recipientUserId) async {
   try {
-    final bankDetails = await userProvider.getBankDetails();
-    
-    if (bankDetails == null) {
-      // Bank details are optional - show info message but allow publishing
-      final shouldAdd = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.info_outline, color: AppColors.warmBrown),
-              const SizedBox(width: 8),
-              const Text('Bank Details'),
-            ],
-          ),
-          content: const Text(
-            'Add your bank details so others can donate and support you. '
-            'You can still publish without bank details - donations will be managed by the platform.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(
-                'Continue Without',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warmBrown,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Add Bank Details'),
-            ),
-          ],
-        ),
-      );
-      
-      if (shouldAdd == true && context.mounted) {
-        // Navigate to bank details screen
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const BankDetailsScreen(isFromUpload: true),
-          ),
-        );
-      }
-      
-      // Always return true - bank details are optional
-      // Publishing is allowed without bank details
-      return true;
-    }
-    
-    return true;
+    final donationService = DonationService();
+    final eligibility =
+        await donationService.eligibilityForUser(recipientUserId);
+    return eligibility.acceptsDonations;
   } catch (e) {
-    AppLogger.debug('Error checking bank details: $e');
-    // Return true on error - don't block publishing
-    return true;
+    AppLogger.error('Error checking recipient donation eligibility', error: e);
+    return false;
   }
+}
+
+Future<void> showRecipientBankDetailsMissingDialog(
+  BuildContext context,
+  String recipientName,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Donations Not Available'),
+      content: Text(
+        '$recipientName has not set up payouts yet, so donations are unavailable.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Show donation modal after eligibility check.
+Future<void> showDonationModalIfEligible(
+  BuildContext context, {
+  required int recipientUserId,
+  required String recipientName,
+  String? contentType,
+  int? contentId,
+}) async {
+  final donationService = DonationService();
+  var acceptsDonations = false;
+  var resolvedRecipientId = recipientUserId;
+
+  try {
+    if (contentType != null && contentId != null) {
+      final eligibility = await donationService.eligibilityForMedia(
+        contentType: contentType,
+        contentId: contentId,
+      );
+      acceptsDonations = eligibility.acceptsDonations;
+      if (eligibility.recipientUserId > 0) {
+        resolvedRecipientId = eligibility.recipientUserId;
+      }
+    } else {
+      final eligibility =
+          await donationService.eligibilityForUser(recipientUserId);
+      acceptsDonations = eligibility.acceptsDonations;
+    }
+  } catch (e) {
+    AppLogger.error('Error checking donation eligibility', error: e);
+  }
+
+  if (!acceptsDonations) {
+    if (context.mounted) {
+      await showRecipientBankDetailsMissingDialog(context, recipientName);
+    }
+    return;
+  }
+
+  if (!context.mounted) return;
+  await showDialog(
+    context: context,
+    builder: (ctx) => DonationModal(
+      recipientName: recipientName,
+      recipientUserId: resolvedRecipientId,
+      contentType: contentType,
+      contentId: contentId,
+    ),
+  );
+}
+
+Future<void> showOrganizationDonationModal(BuildContext context) async {
+  await showDonationModalIfEligible(
+    context,
+    recipientUserId: Environment.organizationRecipientUserId,
+    recipientName: 'Christ New Tabernacle',
+  );
+}
+
+/// Soft post-publish prompt when status may have been stale.
+Future<void> showBankDetailsPromptAfterPublish(BuildContext context) async {
+  await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.celebration, color: AppColors.successMain, size: 28),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('Content Submitted!', style: TextStyle(fontSize: 20)),
+          ),
+        ],
+      ),
+      content: const Text(
+        'Your content was submitted. Set up Paystack payouts to receive donations.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(
+            'Later',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.of(ctx).pop(true);
+            context.read<CreatorProvider>().openPayoutSetup(context);
+          },
+          child: const Text('Set Up Payouts'),
+        ),
+      ],
+    ),
+  );
 }

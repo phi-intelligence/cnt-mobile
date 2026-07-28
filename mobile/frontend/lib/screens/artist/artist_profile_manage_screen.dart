@@ -318,9 +318,6 @@ class _ArtistProfileManageScreenState extends State<ArtistProfileManageScreen> w
                 delegate: _TabBarDelegate(
                   TabBar(
                     controller: _tabController,
-                    labelColor: AppColors.accentMain,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: AppColors.accentMain,
                     tabs: [
                       Tab(text: 'Videos (${videoPodcasts.length})'),
                       Tab(text: 'Audio (${audioPodcasts.length})'),
@@ -590,7 +587,7 @@ class _ArtistProfileManageScreenState extends State<ArtistProfileManageScreen> w
         Text(
           value,
           style: AppTypography.heading2.copyWith(
-            color: AppColors.accentMain,
+            color: AppColors.interactive,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -640,17 +637,17 @@ class _ArtistProfileManageScreenState extends State<ArtistProfileManageScreen> w
             Icon(
               isVideo ? Icons.videocam_off : Icons.music_off,
               size: 64,
-              color: Colors.grey,
+              color: AppColors.textTertiary,
             ),
             const SizedBox(height: 16),
             Text(
               'No ${isVideo ? 'video' : 'audio'} podcasts yet',
-              style: AppTypography.body.copyWith(color: Colors.grey),
+              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
             Text(
               'Start creating content to build your audience!',
-              style: AppTypography.caption.copyWith(color: Colors.grey),
+              style: AppTypography.caption.copyWith(color: AppColors.textTertiary),
             ),
           ],
         ),
@@ -697,7 +694,7 @@ class _ArtistProfileManageScreenState extends State<ArtistProfileManageScreen> w
         trailing: IconButton(
           icon: Icon(
             isVideo ? Icons.play_circle : Icons.play_arrow,
-            color: AppColors.accentMain,
+            color: AppColors.interactive,
           ),
           onPressed: () => isVideo ? _handlePlayVideo(podcast) : _handlePlayAudio(podcast),
         ),
@@ -766,7 +763,7 @@ class _ArtistProfileManageScreenState extends State<ArtistProfileManageScreen> w
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.person_add, size: 64, color: Colors.grey),
+            const Icon(Icons.person_add, size: 64, color: AppColors.textTertiary),
             const SizedBox(height: 16),
             Text(
               'No Artist Profile Yet',

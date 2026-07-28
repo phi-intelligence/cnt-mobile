@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
+import '../theme/app_colors.dart';
 
+/// Card surface for light backgrounds. Uses a solid cream fill so child text
+/// stays readable (the old glass blur was nearly invisible on cream screens).
 class GlassmorphicCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -15,43 +17,23 @@ class GlassmorphicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = borderRadius ?? BorderRadius.circular(16);
+
     return Container(
       decoration: BoxDecoration(
-        borderRadius: borderRadius ?? BorderRadius.circular(16),
+        borderRadius: radius,
+        color: AppColors.cardBackground,
+        border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: AppColors.foregroundPrimary.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: borderRadius ?? BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: padding ?? const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: borderRadius ?? BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.1),
-                  Colors.white.withOpacity(0.05),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
+      padding: padding ?? const EdgeInsets.all(20),
+      child: child,
     );
   }
 }
-

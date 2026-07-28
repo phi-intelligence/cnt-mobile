@@ -96,7 +96,7 @@ class PillTextField extends StatelessWidget {
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: AppTypography.body.copyWith(
-                color: AppColors.textSecondary.withOpacity(0.6),
+                color: AppColors.textPlaceholder,
                 fontSize: 15,
               ),
               prefixIcon: prefixIcon != null
@@ -104,7 +104,7 @@ class PillTextField extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 16, right: 12),
                       child: Icon(
                         prefixIcon,
-                        color: AppColors.warmBrown.withOpacity(0.6),
+                        color: AppColors.warmBrown,
                         size: 22,
                       ),
                     )
@@ -206,13 +206,13 @@ class PillTextFieldOutlined extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: AppTypography.body.copyWith(
-              color: AppColors.textSecondary.withOpacity(0.6),
+              color: AppColors.textPlaceholder,
               fontSize: 15,
             ),
             prefixIcon: prefixIcon != null
                 ? Icon(
                     prefixIcon,
-                    color: AppColors.warmBrown.withOpacity(0.6),
+                    color: AppColors.warmBrown,
                     size: 22,
                   )
                 : null,
@@ -299,14 +299,14 @@ class PillSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: AppTypography.body.copyWith(
-            color: AppColors.textSecondary.withOpacity(0.6),
+            color: AppColors.textPlaceholder,
             fontSize: 15,
           ),
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 16, right: 12),
             child: Icon(
               Icons.search,
-              color: AppColors.warmBrown.withOpacity(0.6),
+              color: AppColors.warmBrown,
               size: 22,
             ),
           ),
@@ -318,7 +318,7 @@ class PillSearchField extends StatelessWidget {
               ? IconButton(
                   icon: Icon(
                     Icons.close,
-                    color: AppColors.warmBrown.withOpacity(0.6),
+                    color: AppColors.warmBrown,
                     size: 20,
                   ),
                   onPressed: () {

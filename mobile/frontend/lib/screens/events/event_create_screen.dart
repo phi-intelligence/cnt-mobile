@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/event.dart';
 import '../../models/location_result.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
@@ -30,6 +31,15 @@ class _EventCreateScreenState extends State<EventCreateScreen> {
   
   // Location data
   LocationResult? _selectedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+    });
+  }
 
   @override
   void dispose() {

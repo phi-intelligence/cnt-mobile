@@ -10,9 +10,12 @@ import '../models/support_message.dart';
 import '../models/document_asset.dart';
 import '../config/environment.dart';
 import 'auth_service.dart';
+import 'subscription_exceptions.dart';
 import '../utils/pinned_http_client.dart';
 import '../utils/app_logger.dart';
 import '../utils/api_error_utils.dart';
+import '../utils/subscription_paywall.dart';
+import '../utils/creator_payout_paywall.dart';
 
 /// API Service for connecting Flutter to backend
 /// 
@@ -81,6 +84,80 @@ class ApiService {
     AppLogger.debug('$context: $error');
     throw Exception(ApiErrorUtils.sanitizeForUser(error, fallback: context));
   }
+
+  Never _handle402Error(http.Response response) {
+    var message =
+        'An active subscription is required to access this feature.';
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is String && detail.isNotEmpty) {
+          message = detail;
+        } else if (detail is Map<String, dynamic>) {
+          final detailMessage = detail['message'] as String?;
+          if (detailMessage != null && detailMessage.isNotEmpty) {
+            message = detailMessage;
+          }
+        }
+      }
+    } catch (_) {
+      // Keep default message.
+    }
+    SubscriptionPaywall.notifyRequired(message);
+    throw SubscriptionRequiredException(message);
+  }
+
+  Never _handleCreatorPayoutRequired(http.Response response) {
+    var message =
+        'Set up Paystack payouts before creating or posting content.';
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is Map<String, dynamic>) {
+          final code = detail['code'] as String?;
+          if (code != 'creator_payout_required') {
+            throw StateError('not creator payout');
+          }
+          final detailMessage = detail['message'] as String?;
+          if (detailMessage != null && detailMessage.isNotEmpty) {
+            message = detailMessage;
+          }
+        } else {
+          throw StateError('not creator payout');
+        }
+      } else {
+        throw StateError('not creator payout');
+      }
+    } catch (_) {
+      throw StateError('not creator payout');
+    }
+    CreatorPayoutPaywall.notifyRequired(message);
+    throw CreatorPayoutRequiredException(message);
+  }
+
+  void _checkSubscriptionRequired(http.Response response) {
+    if (response.statusCode == 402) {
+      _handle402Error(response);
+    }
+  }
+
+  void _checkCreatorPayoutRequired(http.Response response) {
+    if (response.statusCode != 403) return;
+    try {
+      _handleCreatorPayoutRequired(response);
+    } on CreatorPayoutRequiredException {
+      rethrow;
+    } catch (_) {
+      // Other 403s (admin, etc.) fall through to normal error handling.
+    }
+  }
+
+  void _checkPaywalls(http.Response response) {
+    _checkSubscriptionRequired(response);
+    _checkCreatorPayoutRequired(response);
+  }
   
   /// Make an authenticated GET request with automatic token refresh on 401
   Future<http.Response> _authenticatedGet(
@@ -92,6 +169,8 @@ class ApiService {
       uri,
       headers: await _getHeaders(),
     ).timeout(timeout);
+
+    _checkPaywalls(response);
     
     if (response.statusCode == 401 && allowRetry) {
       // Try to refresh the token
@@ -121,6 +200,8 @@ class ApiService {
       headers: await _getHeaders(),
       body: body,
     ).timeout(timeout);
+
+    _checkPaywalls(response);
     
     if (response.statusCode == 401 && allowRetry) {
       // Try to refresh the token
@@ -150,6 +231,8 @@ class ApiService {
       headers: await _getHeaders(),
       body: body,
     ).timeout(timeout);
+
+    _checkPaywalls(response);
     
     if (response.statusCode == 401 && allowRetry) {
       // Try to refresh the token
@@ -177,6 +260,8 @@ class ApiService {
       uri,
       headers: await _getHeaders(),
     ).timeout(timeout);
+
+    _checkPaywalls(response);
     
     if (response.statusCode == 401 && allowRetry) {
       // Try to refresh the token

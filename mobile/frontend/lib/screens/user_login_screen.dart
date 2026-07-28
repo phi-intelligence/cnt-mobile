@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../navigation/mobile_navigation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -55,13 +54,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     );
 
     if (mounted) {
-      if (success) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const MobileNavigationLayout(),
-          ),
-        );
-      } else {
+      if (!success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authProvider.error ?? 'Login failed'),
@@ -84,14 +77,8 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
 
     if (mounted) {
       setState(() => _isGoogleLoading = false);
-      
-      if (success) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const MobileNavigationLayout(),
-          ),
-        );
-      } else {
+
+      if (!success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authProvider.error ?? 'Google sign-in failed'),

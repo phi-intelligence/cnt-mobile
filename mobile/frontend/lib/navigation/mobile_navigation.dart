@@ -10,10 +10,12 @@ import '../widgets/media/sliding_audio_player.dart';
 import '../widgets/meeting/pip_meeting_overlay.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/creator_provider.dart';
 import '../providers/support_provider.dart';
 import '../widgets/notifications/stream_notification_banner.dart';
 import '../utils/platform_utils.dart';
 import '../theme/app_colors.dart';
+import '../screens/bank_details_screen.dart';
 
 /// Mobile Navigation Layout - 5 tabs matching React Native exactly
 /// Tabs: Home, Search, Plus/Create, Community, Profile
@@ -188,7 +190,24 @@ class MobileNavigationLayoutState extends State<MobileNavigationLayout> {
             ),
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
-        onTap: (index) {
+        onTap: (index) async {
+          // Create tab (index 2): require Paystack payout for non-admins
+          if (index == 2) {
+            final auth = context.read<AuthProvider>();
+            final creator = context.read<CreatorProvider>();
+            if (!auth.isAdmin &&
+                creator.hasLoaded &&
+                !creator.isCreatorReady) {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const BankDetailsScreen(isFromCreator: true),
+                ),
+              );
+              if (mounted) await creator.refresh();
+              return;
+            }
+          }
           setState(() {
             _currentIndex = index;
           });

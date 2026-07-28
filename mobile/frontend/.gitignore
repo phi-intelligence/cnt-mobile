@@ -49,6 +49,7 @@ app.*.map.json
 .env.*
 !.env.example
 android/key.properties
+android/keystore.credentials
 *.jks
 *.keystore
 upload-keystore.jks

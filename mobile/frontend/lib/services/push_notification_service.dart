@@ -5,14 +5,17 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../config/environment.dart';
+import '../firebase_options.dart';
 import '../utils/pinned_http_client.dart';
 import 'auth_service.dart';
+import 'firebase_bootstrap.dart';
 
 /// Background message handler - must be a top-level function
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Ensure Firebase is initialized for background handling
-  await Firebase.initializeApp();
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
   
   if (kDebugMode) {
     debugPrint('🔔 Background message received: ${message.messageId}');
@@ -49,8 +52,15 @@ class PushNotificationService {
   String? get fcmToken => _fcmToken;
 
   /// Initialize the push notification service
-  /// Call this after Firebase.initializeApp() in main.dart
+  /// Call this after [FirebaseBootstrap.initialize] in main.dart
   Future<void> initialize() async {
+    if (!FirebaseBootstrap.isInitialized) {
+      if (kDebugMode) {
+        debugPrint('⚠️ Push notifications skipped — Firebase not initialized');
+      }
+      return;
+    }
+
     try {
       // Set up background message handler
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -266,10 +276,18 @@ class PushNotificationService {
   /// Register token when user logs in
   /// Call this after successful authentication
   Future<void> registerTokenAfterLogin() async {
-    if (_fcmToken != null) {
-      await _registerTokenWithBackend(_fcmToken!);
-    } else {
-      await _getToken();
+    if (!FirebaseBootstrap.isInitialized) return;
+
+    try {
+      if (_fcmToken != null) {
+        await _registerTokenWithBackend(_fcmToken!);
+      } else {
+        await _getToken();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ registerTokenAfterLogin failed: $e');
+      }
     }
   }
 

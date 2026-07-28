@@ -5,6 +5,7 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../providers/draft_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../services/api_service.dart';
 import '../creation/video_podcast_create_screen.dart';
 import '../creation/audio_podcast_create_screen.dart';
@@ -16,7 +17,6 @@ import '../live/live_stream_start_screen.dart';
 import 'quote_create_screen_mobile.dart';
 import '../events/events_list_screen.dart';
 import 'drafts_list_screen.dart';
-import '../../utils/bank_details_helper.dart';
 import '../admin/bulk_upload_screen.dart';
 import '../admin/bible_upload_screen.dart';
 
@@ -34,12 +34,19 @@ class _CreateScreenMobileState extends State<CreateScreenMobile> {
   void initState() {
     super.initState();
     // Fetch drafts when screen loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final ready =
+          await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+      if (!mounted || !ready) return;
       context.read<DraftProvider>().fetchDrafts();
     });
   }
 
-  void _navigateToScreen(BuildContext context, Widget screen) {
+  void _navigateToScreen(BuildContext context, Widget screen) async {
+    final ready =
+        await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+    if (!context.mounted || !ready) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => screen),

@@ -11,7 +11,7 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../widgets/shared/image_helper.dart';
 import '../../widgets/queue_bottom_sheet.dart';
-import '../donation_modal.dart';
+import '../../utils/bank_details_helper.dart';
 import '../artist/artist_profile_screen.dart';
 
 /// Full-Screen Audio Player Screen
@@ -654,12 +654,13 @@ class _AudioPlayerFullScreenNewState extends State<AudioPlayerFullScreenNew> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
-          showDialog(
-            context: context,
-            builder: (_) => DonationModal(
-              recipientName: track.creator,
-              recipientUserId: track.creatorId ?? 1,
-            ),
+          final contentId = int.tryParse(track.id);
+          showDonationModalIfEligible(
+            context,
+            recipientUserId: track.creatorId ?? 0,
+            recipientName: track.creator,
+            contentType: 'podcast',
+            contentId: contentId,
           );
         },
         icon: const Icon(Icons.favorite, color: Colors.white, size: 20),

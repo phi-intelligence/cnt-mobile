@@ -1,11 +1,11 @@
 {
-    "name": "cnt_media_platform",
-    "short_name": "cnt_media_platform",
+    "name": "Christ New Tabernacle Media",
+    "short_name": "Christ Media",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5F0E8",
+    "theme_color": "#F5F0E8",
+    "description": "Christ New Tabernacle faith-based media and community platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

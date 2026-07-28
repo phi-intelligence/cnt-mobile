@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/draft_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
@@ -41,6 +42,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.initState();
     _draftId = widget.draftId;
     _captionController.addListener(_onFieldChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+    });
     _loadUserInfo();
     if (_draftId != null) {
       _loadDraft();

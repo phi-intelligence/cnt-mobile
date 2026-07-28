@@ -190,4 +190,19 @@ class Environment {
     
     return _devLiveKitHttpUrl;
   }
+
+  /// Platform organization recipient for profile "Donate" (Paystack).
+  static int get organizationRecipientUserId {
+    const dartDefine = int.fromEnvironment(
+      'ORGANIZATION_RECIPIENT_USER_ID',
+      defaultValue: 0,
+    );
+    if (dartDefine > 0) return dartDefine;
+
+    final dotenvValue = _dotenvGet('ORGANIZATION_RECIPIENT_USER_ID');
+    if (dotenvValue != null && dotenvValue.isNotEmpty) {
+      return int.tryParse(dotenvValue) ?? 1;
+    }
+    return 1;
+  }
 }

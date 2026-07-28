@@ -4,6 +4,7 @@ import '../../models/content_item.dart';
 import '../shared/image_helper.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_typography.dart';
 
 class ContentCardMobile extends StatelessWidget {
   final ContentItem item;
@@ -77,9 +78,9 @@ class ContentCardMobile extends StatelessWidget {
                   children: [
                     Text(
                       item.title,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: AppTypography.body.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -87,9 +88,8 @@ class ContentCardMobile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       item.creator,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -100,22 +100,20 @@ class ContentCardMobile extends StatelessWidget {
                         if (item.duration != null)
                           Text(
                             _formatDuration(item.duration),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textTertiary,
                             ),
                           ),
                         if (item.plays > 0)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.play_arrow, size: 14, color: Colors.grey[500]),
+                              Icon(Icons.play_arrow, size: 14, color: AppColors.textTertiary),
                               const SizedBox(width: 4),
                               Text(
                                 '${item.plays}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textTertiary,
                                 ),
                               ),
                             ],

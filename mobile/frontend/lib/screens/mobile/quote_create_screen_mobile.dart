@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/community_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
@@ -18,6 +19,15 @@ class _QuoteCreateScreenMobileState extends State<QuoteCreateScreenMobile> {
   final _formKey = GlobalKey<FormState>();
   final _quoteController = TextEditingController();
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+    });
+  }
 
   @override
   void dispose() {

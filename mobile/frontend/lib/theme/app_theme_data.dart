@@ -17,13 +17,13 @@ class AppThemeData {
       primary: AppColors.primaryMain,
       onPrimary: AppColors.textInverse,
       secondary: AppColors.accentMain,
-      onSecondary: AppColors.textInverse,
+      onSecondary: AppColors.foregroundPrimary,
       tertiary: AppColors.secondaryMain,
       onTertiary: AppColors.foregroundPrimary,
       surface: AppColors.backgroundSecondary,
       onSurface: AppColors.foregroundPrimary,
-      surfaceVariant: AppColors.backgroundSecondary,
-      onSurfaceVariant: AppColors.foregroundPrimary,
+      surfaceContainerHighest: AppColors.backgroundTertiary,
+      onSurfaceVariant: AppColors.textSecondary,
       error: AppColors.errorMain,
       onError: AppColors.textInverse,
       outline: AppColors.borderPrimary,
@@ -70,6 +70,9 @@ class AppThemeData {
         borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
         borderSide: BorderSide(color: AppColors.errorMain, width: 2),
       ),
+      hintStyle: AppTypography.body.copyWith(color: AppColors.textPlaceholder),
+      labelStyle: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+      floatingLabelStyle: AppTypography.bodySmall.copyWith(color: AppColors.primaryMain),
     ),
 
     // Text theme
@@ -117,6 +120,30 @@ class AppThemeData {
       ),
       elevation: 2,
       type: BottomNavigationBarType.fixed,
+    ),
+
+    tabBarTheme: const TabBarThemeData(
+      labelColor: AppColors.tabSelected,
+      unselectedLabelColor: AppColors.tabUnselected,
+      indicatorColor: AppColors.primaryMain,
+      dividerColor: AppColors.borderSecondary,
+    ),
+
+    listTileTheme: ListTileThemeData(
+      iconColor: AppColors.primaryMain,
+      titleTextStyle: AppTypography.body.copyWith(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w600,
+      ),
+      subtitleTextStyle: AppTypography.bodySmall.copyWith(
+        color: AppColors.textSecondary,
+      ),
+    ),
+
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.foregroundPrimary,
+      contentTextStyle: AppTypography.body.copyWith(color: AppColors.textInverse),
+      actionTextColor: AppColors.accentLight,
     ),
 
     // Dialog theme
@@ -168,7 +195,7 @@ class AppThemeData {
 
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.primaryMain,
+        foregroundColor: AppColors.interactive,
         padding: EdgeInsets.symmetric(
           horizontal: AppSpacing.medium,
           vertical: AppSpacing.small,
@@ -204,7 +231,8 @@ class AppThemeData {
         horizontal: AppSpacing.small,
         vertical: AppSpacing.tiny,
       ),
-      labelStyle: AppTypography.bodySmall,
+      labelStyle: AppTypography.bodySmall.copyWith(color: AppColors.textPrimary),
+      secondaryLabelStyle: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
       padding: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusFull),

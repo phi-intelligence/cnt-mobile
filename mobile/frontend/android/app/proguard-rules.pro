@@ -71,8 +71,24 @@
 -keep class com.stripe.android.** { *; }
 -dontwarn com.stripe.android.**
 
-# Flutter Secure Storage
+# Flutter Secure Storage + AndroidX crypto (used by encryptedSharedPreferences)
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
+-keep class androidx.security.crypto.** { *; }
+-keep class androidx.security.** { *; }
+-dontwarn androidx.security.**
+
+# Keep generated plugin registrant so release minify does not drop native plugins
+-keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
+
+# Shared Preferences (Pigeon API used by shared_preferences_android)
+-keep class io.flutter.plugins.sharedpreferences.** { *; }
+-keep class dev.flutter.pigeon.** { *; }
+
+# Firebase / FCM / Google Play Services
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
 
 # App security / networking
 -keep class com.christtabernacle.cntmedia.MainActivity { *; }

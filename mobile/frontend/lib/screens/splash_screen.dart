@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import 'user_login_screen.dart';
 
 /// Splash Screen - Shows CNT logo with animated transition to login
 /// Displays when app first launches for brand recognition
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback onComplete;
+
+  const SplashScreen({
+    super.key,
+    required this.onComplete,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -59,23 +63,10 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation
     _animationController.forward();
 
-    // Navigate to login after animation completes
+    // Transition to login after animation completes
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const UserLoginScreen(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
+        widget.onComplete();
       }
     });
   }

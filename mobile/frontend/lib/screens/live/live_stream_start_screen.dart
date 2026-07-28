@@ -4,6 +4,7 @@ import 'package:livekit_client/livekit_client.dart';
 import '../../services/api_service.dart';
 import '../../services/livekit_meeting_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
@@ -34,7 +35,13 @@ class _LiveStreamStartScreenState extends State<LiveStreamStartScreen> {
   void initState() {
     super.initState();
     _titleController.text = 'Live Stream - ${DateTime.now().toString().substring(0, 16)}';
-    _initializeCamera();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final ready =
+          await context.read<CreatorProvider>().ensureReadyOrRedirect(context);
+      if (!mounted || !ready) return;
+      _initializeCamera();
+    });
   }
 
   Future<void> _initializeCamera() async {

@@ -85,8 +85,16 @@ class AuthProvider extends ChangeNotifier {
   }
   
   Future<void> _onAuthSuccess() async {
-    await PushNotificationService().registerTokenAfterLogin();
-    await WebSocketService().reconnect();
+    try {
+      await PushNotificationService().registerTokenAfterLogin();
+    } catch (e) {
+      AppLogger.warning('Push token registration skipped after login', error: e);
+    }
+    try {
+      await WebSocketService().reconnect();
+    } catch (e) {
+      AppLogger.warning('WebSocket reconnect skipped after login', error: e);
+    }
   }
 
   Future<bool> login(String usernameOrEmail, String password) async {

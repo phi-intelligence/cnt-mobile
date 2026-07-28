@@ -70,9 +70,15 @@ class AppColors {
   // Text colors
   static const Color textPrimary = Color(0xFF2D2520); // Main text
   static const Color textSecondary = Color(0xFF5A4F47); // Secondary text
-  static const Color textTertiary = Color(0xFF8B7D73); // Tertiary text
-  static const Color textPlaceholder = Color(0xFFA69B94); // Placeholder text
+  static const Color textTertiary = Color(0xFF6F6258); // Tertiary text (darkened for contrast on cream)
+  static const Color textPlaceholder = Color(0xFF8B7D73); // Placeholder text
   static const Color textInverse = Color(0xFFF7F5F2); // Inverse text (on dark backgrounds)
+  static const Color textOnDarkMuted = Color(0xE6F7F5F2); // ~90% cream on brown/dark surfaces
+
+  /// Links, tabs, stats, icons on **light** backgrounds — use instead of [accentMain] for text.
+  static const Color interactive = Color(0xFF6B5A3F); // same as primaryDark
+  static const Color tabSelected = Color(0xFF6B5A3F);
+  static const Color tabUnselected = Color(0xFF5A4F47);
 
   // Glassmorphic effects (transparent colors)
   static const Color glassLight = Color.fromRGBO(255, 255, 255, 0.15);

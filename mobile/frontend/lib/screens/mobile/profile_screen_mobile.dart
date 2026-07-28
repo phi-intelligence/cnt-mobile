@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/support_provider.dart';
 import '../../providers/artist_provider.dart';
 import '../../providers/favorites_provider.dart';
+import '../../providers/creator_provider.dart';
 import '../../utils/format_utils.dart';
 import '../admin_dashboard.dart';
 import '../admin/admin_support_page.dart';
@@ -19,11 +20,13 @@ import '../bank_details_screen.dart';
 import '../support/support_center_screen.dart';
 import '../artist/artist_profile_manage_screen.dart';
 import '../../utils/media_utils.dart';
+import '../../utils/bank_details_helper.dart';
 import 'favorites_screen_mobile.dart';
 import 'downloads_screen_mobile.dart';
 import 'notifications_screen_mobile.dart';
 import 'about_screen_mobile.dart';
-import '../donation_modal.dart';
+import 'billing_screen_mobile.dart';
+import 'donation_history_screen_mobile.dart';
 import '../../utils/app_logger.dart';
 
 class ProfileScreenMobile extends StatefulWidget {
@@ -270,15 +273,7 @@ class _ProfileScreenMobileState extends State<ProfileScreenMobile> {
                           const SizedBox(width: AppSpacing.medium),
                           // Donate button
                           GestureDetector(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => const DonationModal(
-                                  recipientName: 'Christ New Tabernacle Ministry',
-                                  recipientUserId: 1, // Ministry/church account ID
-                                ),
-                              );
-                            },
+                            onTap: () => showOrganizationDonationModal(context),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
@@ -324,38 +319,111 @@ class _ProfileScreenMobileState extends State<ProfileScreenMobile> {
               
               const SizedBox(height: AppSpacing.medium),
 
-              // Creator Section - Artist Profile and Bank Details at top
-              // Artist Profile (shows for users who have created content)
-              if (artistProvider.hasArtistProfile || artistProvider.myArtist != null) ...[
-                _buildSectionTitle('Creator'),
-                _buildSettingTile(
-                  icon: Icons.mic_external_on,
-                  title: 'My Artist Profile',
-                  subtitle: artistProvider.myArtist?.artistName ?? 'Manage your creator profile',
-                  iconColor: AppColors.accentMain,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ArtistProfileManageScreen(),
+              // Creator section — Become a Creator or manage artist
+              Consumer<CreatorProvider>(
+                builder: (context, creatorProvider, _) {
+                  final isReady = creatorProvider.isCreatorReady;
+                  final hasArtist =
+                      artistProvider.hasArtistProfile ||
+                      artistProvider.myArtist != null;
+
+                  if (creatorProvider.isLoading && !creatorProvider.hasLoaded) {
+                    return const Padding(
+                      padding: EdgeInsets.all(AppSpacing.large),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.warmBrown,
+                        ),
                       ),
                     );
-                  },
-                ),
-                _buildSettingTile(
-                  icon: Icons.account_balance_outlined,
-                  title: 'Bank Details',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const BankDetailsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: AppSpacing.small),
-              ],
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle('Creator'),
+                      if (isReady && hasArtist) ...[
+                        _buildSettingTile(
+                          icon: Icons.mic_external_on,
+                          title: 'My Artist Profile',
+                          subtitle: artistProvider.myArtist?.artistName ??
+                              'Manage your creator profile',
+                          iconColor: AppColors.primaryMain,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ArtistProfileManageScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildSettingTile(
+                          icon: Icons.account_balance_outlined,
+                          title: 'Payout Settings',
+                          subtitle: 'Paystack bank or mobile money',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const BankDetailsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ] else if (isReady) ...[
+                        _buildSettingTile(
+                          icon: Icons.mic_external_on,
+                          title: 'Manage Artist Profile',
+                          subtitle: 'Set up your public artist page',
+                          iconColor: AppColors.primaryMain,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ArtistProfileManageScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildSettingTile(
+                          icon: Icons.account_balance_outlined,
+                          title: 'Payout Settings',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const BankDetailsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ] else ...[
+                        _buildSettingTile(
+                          icon: Icons.star_outline,
+                          title: 'Become a Creator',
+                          subtitle:
+                              'Set up Paystack payouts to publish content',
+                          iconColor: AppColors.warmBrown,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const BankDetailsScreen(
+                                  isFromCreator: true,
+                                ),
+                              ),
+                            ).then((_) => creatorProvider.refresh());
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.small),
+                    ],
+                  );
+                },
+              ),
 
               // Account Section
               _buildSectionTitle('Account'),
@@ -371,20 +439,32 @@ class _ProfileScreenMobileState extends State<ProfileScreenMobile> {
                   );
                 },
               ),
-              // Bank Details for non-creators
-              if (!(artistProvider.hasArtistProfile || artistProvider.myArtist != null))
-                _buildSettingTile(
-                  icon: Icons.account_balance_outlined,
-                  title: 'Bank Details',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const BankDetailsScreen(),
-                      ),
-                    );
-                  },
-                ),
+              _buildSettingTile(
+                icon: Icons.volunteer_activism_outlined,
+                title: 'Donation History',
+                subtitle: 'Sent and received donations',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DonationHistoryScreenMobile(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.card_membership_outlined,
+                title: 'Subscription & Billing',
+                subtitle: 'Manage your CNT subscription',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const BillingScreenMobile(),
+                    ),
+                  );
+                },
+              ),
               _buildSettingTile(
                 icon: isAdmin ? Icons.support_agent : Icons.help_outline,
                 title: isAdmin ? 'Support Inbox' : 'Help & Support',

@@ -16,9 +16,16 @@ import '../providers/artist_provider.dart';
 import '../providers/event_provider.dart';
 import '../providers/download_provider.dart';
 import '../providers/draft_provider.dart';
+import '../providers/subscription_provider.dart';
+import '../providers/creator_provider.dart';
 import '../services/websocket_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/meeting/pip_meeting_overlay.dart';
+import '../utils/subscription_paywall.dart';
+import '../utils/creator_payout_paywall.dart';
+import '../screens/mobile/subscribe_screen_mobile.dart';
+import '../screens/bank_details_screen.dart';
+import '../screens/user_login_screen.dart';
 import 'mobile_navigation.dart';
 import '../screens/splash_screen.dart';
 import '../utils/app_logger.dart';
@@ -29,19 +36,24 @@ import '../utils/app_logger.dart';
 class AppRouter extends StatefulWidget {
   const AppRouter({super.key});
 
+  /// Used for subscription paywall navigation from ApiService 402 handling.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   State<AppRouter> createState() => _AppRouterState();
 }
 
 class _AppRouterState extends State<AppRouter> {
+  bool _paywallsWired = false;
+
   @override
   void initState() {
     super.initState();
     AppLogger.debug('✅ AppRouter initState');
-    // Initialize WebSocket connection asynchronously after first frame
-    // This prevents blocking the build method and handles errors gracefully
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _wirePaywalls();
       _initializeWebSocket();
     });
   }
@@ -52,17 +64,62 @@ class _AppRouterState extends State<AppRouter> {
       await WebSocketService().connect();
       AppLogger.debug('✅ AppRouter: WebSocket connected');
     } catch (e, stackTrace) {
-      // Log error but don't crash the app
-      // WebSocket connection is non-critical for app functionality
-      AppLogger.debug('❌ AppRouter: WebSocket connection failed (non-critical): $e');
+      AppLogger.debug(
+          '❌ AppRouter: WebSocket connection failed (non-critical): $e');
       AppLogger.debug('Stack trace: $stackTrace');
     }
+  }
+
+  void _wirePaywalls() {
+    if (_paywallsWired) return;
+    _paywallsWired = true;
+
+    SubscriptionPaywall.onRequired = (message) {
+      final nav = AppRouter.navigatorKey.currentState;
+      final ctx = AppRouter.navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      nav?.push(
+        MaterialPageRoute(builder: (_) => const SubscribeScreenMobile()),
+      );
+    };
+
+    CreatorPayoutPaywall.onRequired = (message) {
+      final nav = AppRouter.navigatorKey.currentState;
+      final ctx = AppRouter.navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      nav?.push(
+        MaterialPageRoute(
+          builder: (_) => const BankDetailsScreen(isFromCreator: true),
+        ),
+      );
+    };
+  }
+
+  @override
+  void dispose() {
+    SubscriptionPaywall.clear();
+    CreatorPayoutPaywall.clear();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     AppLogger.debug('✅ AppRouter: Building mobile navigation...');
-    
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -82,32 +139,128 @@ class _AppRouterState extends State<AppRouter> {
         ChangeNotifierProvider(create: (_) => PipMeetingManager()),
         ChangeNotifierProvider(create: (_) => DownloadProvider()),
         ChangeNotifierProvider(create: (_) => DraftProvider()),
+        ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
+        ChangeNotifierProvider(create: (_) => CreatorProvider()),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          // Show main app if authenticated, otherwise show splash -> login flow
-          if (authProvider.isAuthenticated) {
-            // All users (including admins) see the normal app navigation
-            // Admin dashboard is accessible from profile or navigation menu
-            return MaterialApp(
-              title: 'Christ Media',
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              themeMode: ThemeMode.light, // Force light theme only
-              home: const MobileNavigationLayout(),
-            );
-          } else {
-            // Not authenticated - show splash screen (which transitions to login)
-            return MaterialApp(
-              title: 'Christ Media',
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              themeMode: ThemeMode.light, // Force light theme only
-              home: const SplashScreen(),
-            );
-          }
-        },
+      child: const _SessionBootstrap(
+        child: _RootMaterialApp(),
       ),
     );
   }
+}
+
+/// Single [MaterialApp] instance — never recreate on provider updates.
+class _RootMaterialApp extends StatelessWidget {
+  const _RootMaterialApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Christ Media',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
+      navigatorKey: AppRouter.navigatorKey,
+      home: const _AppFlow(),
+    );
+  }
+}
+
+/// Splash → login → main tabs, driven by auth state (no nested navigators).
+class _AppFlow extends StatefulWidget {
+  const _AppFlow();
+
+  @override
+  State<_AppFlow> createState() => _AppFlowState();
+}
+
+class _AppFlowState extends State<_AppFlow> {
+  bool _splashComplete = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    if (auth.isAuthenticated) {
+      return const MobileNavigationLayout();
+    }
+
+    if (!_splashComplete) {
+      return SplashScreen(
+        onComplete: () {
+          if (mounted) {
+            setState(() => _splashComplete = true);
+          }
+        },
+      );
+    }
+
+    return const UserLoginScreen();
+  }
+}
+
+class _SessionBootstrap extends StatefulWidget {
+  final Widget child;
+
+  const _SessionBootstrap({required this.child});
+
+  @override
+  State<_SessionBootstrap> createState() => _SessionBootstrapState();
+}
+
+class _SessionBootstrapState extends State<_SessionBootstrap> {
+  bool? _wasAuthenticated;
+  AuthProvider? _authProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.read<AuthProvider>();
+    if (_authProvider == auth) return;
+
+    _authProvider?.removeListener(_handleAuthChange);
+    _authProvider = auth;
+    _authProvider!.addListener(_handleAuthChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleAuthChange());
+  }
+
+  void _handleAuthChange() {
+    final auth = _authProvider;
+    if (auth == null) return;
+
+    final subscriptionProvider = context.read<SubscriptionProvider>();
+    final creatorProvider = context.read<CreatorProvider>();
+    final isAuth = auth.isAuthenticated;
+
+    if (_wasAuthenticated == isAuth) {
+      if (isAuth) {
+        creatorProvider.syncAuth(
+          isAuthenticated: true,
+          isAdmin: auth.isAdmin,
+        );
+      }
+      return;
+    }
+    _wasAuthenticated = isAuth;
+
+    if (isAuth) {
+      subscriptionProvider.refreshMe();
+      creatorProvider.syncAuth(
+        isAuthenticated: true,
+        isAdmin: auth.isAdmin,
+      );
+    } else {
+      subscriptionProvider.clear();
+      creatorProvider.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _authProvider?.removeListener(_handleAuthChange);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

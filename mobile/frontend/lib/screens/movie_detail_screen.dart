@@ -426,7 +426,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           children: [
                             const Icon(
                               Icons.star,
-                              color: AppColors.accentMain,
+                              color: AppColors.interactive,
                               size: 20,
                             ),
                             const SizedBox(width: 4),

@@ -9,7 +9,7 @@ import '../../theme/app_typography.dart';
 import '../../models/content_item.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/favorites_provider.dart';
-import '../donation_modal.dart';
+import '../../utils/bank_details_helper.dart';
 
 /// Video Player Full Screen - Exact replica of React Native implementation
 /// Features auto-hiding controls, fullscreen toggle, and gradient background
@@ -674,7 +674,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
           ),
           child: Column(
             children: [
-              // Top Bar (hidden in fullscreen)
+              // Top Bar (hidden in fullscreen) — dark text on light cream gradient
               if (!_isFullscreen)
                 SafeArea(
                   child: Container(
@@ -683,17 +683,20 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         onPressed: widget.onBack,
                       ),
                       Expanded(
                         child: Center(
                           child: Text(
-                            'Video Podcast',
+                            widget.title,
                             style: AppTypography.heading4.copyWith(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
@@ -710,13 +713,14 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                               icon: const Icon(Icons.volunteer_activism, size: 20),
                               color: Colors.white,
                               onPressed: () {
-                                // Open donation modal with current item's creator info
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => DonationModal(
-                                    recipientName: _currentItem.creator,
-                                    recipientUserId: _currentItem.creatorId ?? 1,
-                                  ),
+                                final item = _currentItem;
+                                final contentId = int.tryParse(item.id);
+                                showDonationModalIfEligible(
+                                  context,
+                                  recipientUserId: item.creatorId ?? 0,
+                                  recipientName: item.creator,
+                                  contentType: 'podcast',
+                                  contentId: contentId,
                                 );
                               },
                               tooltip: 'Donate',
@@ -730,7 +734,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                           const SizedBox(width: 4),
                           IconButton(
                             icon: const Icon(Icons.download),
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             onPressed: () {
                               final downloadProvider =
                                   context.read<DownloadProvider>();
@@ -746,7 +750,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                                 icon: Icon(
                                   isFavorite ? Icons.favorite : Icons.favorite_border,
                                 ),
-                                color: isFavorite ? Colors.red : Colors.white,
+                                color: isFavorite ? Colors.red : AppColors.textPrimary,
                                 onPressed: () async {
                                   final success = await favoritesProvider.toggleFavorite(_currentItem);
                                   if (success && mounted) {

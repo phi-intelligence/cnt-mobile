@@ -12,6 +12,12 @@ class ApiErrorUtils {
     if (message.contains('401') || message.contains('403')) {
       return 'You do not have permission to perform this action.';
     }
+    if (message.contains('402') ||
+        message.contains('subscription_required') ||
+        message.contains('SubscriptionRequiredException') ||
+        message.contains('active subscription is required')) {
+      return 'An active subscription is required to access this feature.';
+    }
     if (message.contains('404')) {
       return 'The requested resource was not found.';
     }

@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter/services.dart';
+
+import '../models/donation.dart';
 import '../services/donation_service.dart';
+import '../services/subscription_exceptions.dart';
+import '../screens/mobile/paystack_checkout_webview_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../utils/security_hardening.dart';
-import '../utils/api_error_utils.dart';
 
 class DonationModal extends StatefulWidget {
   final String recipientName;
   final int recipientUserId;
-  
+  final String? contentType;
+  final int? contentId;
+
   const DonationModal({
     super.key,
     required this.recipientName,
     required this.recipientUserId,
+    this.contentType,
+    this.contentId,
   });
 
   @override
@@ -27,6 +32,7 @@ class _DonationModalState extends State<DonationModal> {
   final _amountController = TextEditingController();
   final DonationService _donationService = DonationService();
   bool _isProcessing = false;
+  double? _selectedPreset;
 
   @override
   void dispose() {
@@ -35,236 +41,165 @@ class _DonationModalState extends State<DonationModal> {
   }
 
   Future<void> _handleDonate() async {
-    if (!_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    final amount = double.tryParse(_amountController.text);
+    final validationError = DonationAmountLimits.validateGhsAmount(amount);
+    if (validationError != null) {
+      _showSnackBar(validationError, isError: true);
       return;
     }
 
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount < 1 || amount > 10000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter an amount between \$1 and \$10,000'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    final amountPesewas = ((amount ?? 0) * 100).round();
+    if (amountPesewas <= 0) {
+      _showSnackBar('Please enter a valid amount', isError: true);
       return;
     }
 
     setState(() => _isProcessing = true);
 
+    final useMediaContext =
+        widget.contentType != null && widget.contentId != null;
+
     try {
-      // Create payment intent
-      final paymentIntent = await _donationService.createPaymentIntent(
-        recipientUserId: widget.recipientUserId,
-        amount: amount,
-        currency: 'USD',
+      final result = await _donationService.initialize(
+        amountPesewas: amountPesewas,
+        recipientUserId: useMediaContext ? null : widget.recipientUserId,
+        contentType: useMediaContext ? widget.contentType : null,
+        contentId: useMediaContext ? widget.contentId : null,
       );
 
-      // Set Stripe publishable key from backend response
-      if (paymentIntent.containsKey('publishable_key')) {
-        Stripe.publishableKey = paymentIntent['publishable_key'];
+      final authorizationUrl = result.authorizationUrl;
+      if (authorizationUrl == null || authorizationUrl.isEmpty) {
+        throw const DonationServiceException('Missing Paystack checkout URL');
       }
 
-      // Initialize Stripe payment sheet
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: paymentIntent['client_secret'],
-          merchantDisplayName: 'CNT Media Platform',
-          customerId: paymentIntent['customer_id'],
-          customerEphemeralKeySecret: paymentIntent['ephemeral_key'],
-          style: ThemeMode.system,
-          appearance: PaymentSheetAppearance(
-            colors: PaymentSheetAppearanceColors(
-              primary: AppColors.warmBrown,
-            ),
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      final reference = await Navigator.of(context).push<String?>(
+        MaterialPageRoute(
+          builder: (_) => PaystackCheckoutWebViewScreen(
+            authorizationUrl: authorizationUrl,
+            callbackPathContains: '/donation/callback',
           ),
         ),
       );
 
-      // Present payment sheet
-      await Stripe.instance.presentPaymentSheet();
+      if (reference == null || reference.isEmpty) return;
 
-      // Payment successful, confirm with backend
-      await _donationService.confirmDonation(paymentIntent['payment_intent_id']);
+      final verify = await _donationService.verify(reference);
+      if (!mounted) return;
 
-      if (mounted) {
-        Navigator.of(context).pop(true); // Return success
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Donation of \$${amount.toStringAsFixed(2)} sent successfully!'),
-            backgroundColor: Colors.green,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            verify.isSuccess
+                ? 'Thank you for your donation!'
+                : 'Donation status: ${verify.status}',
           ),
-        );
-      }
-    } on StripeException catch (e) {
-      if (mounted) {
-        // User cancelled or error occurred
-        if (e.error.code != FailureCode.Canceled) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Payment failed: ${e.error.message ?? e.error.code.name}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+          backgroundColor:
+              verify.isSuccess ? AppColors.successMain : AppColors.errorMain,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on SubscriptionRequiredException {
+      if (mounted) Navigator.of(context).maybePop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Donation failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar(e.toString(), isError: true);
       }
     } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.errorMain : AppColors.successMain,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _selectPreset(double value) {
+    setState(() {
+      _selectedPreset = value;
+      _amountController.text = value.toStringAsFixed(0);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (SecurityHardening.isSensitiveFeaturesBlocked) {
-      return SecureScreen(
-        child: Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.large),
-            child: Text(
-              'Donations are unavailable on modified devices for security reasons.',
-              style: AppTypography.body.copyWith(color: AppColors.errorMain),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-    
-    return SecureScreen(
-      child: Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          maxWidth: 400,
-      ),
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.large,
-            right: AppSpacing.large,
-            top: AppSpacing.large,
-            bottom: AppSpacing.large + bottomPadding,
-          ),
+        padding: const EdgeInsets.all(AppSpacing.large),
         child: Form(
           key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                // Header row
-              Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                    Expanded(
-                      child: Text(
-                    'Donate to ${widget.recipientName}',
-                    style: AppTypography.heading3.copyWith(
-                      fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                  ),
-                ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Donate to ${widget.recipientName}',
+                style: AppTypography.heading3.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-                const SizedBox(height: AppSpacing.medium),
-              
-                // Scrollable content
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-              // Amount field
+              const SizedBox(height: AppSpacing.small),
+              Text(
+                'Support this creator with a gift (GHS).',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.large),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: DonationAmountLimits.presetGhs.map((preset) {
+                  final selected = _selectedPreset == preset;
+                  return ChoiceChip(
+                    label: Text('${preset.toStringAsFixed(0)} GHS'),
+                    selected: selected,
+                    onSelected: (_) => _selectPreset(preset),
+                    selectedColor: AppColors.warmBrown.withValues(alpha: 0.2),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: AppSpacing.medium),
               TextFormField(
                 controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                ],
                 decoration: InputDecoration(
-                  labelText: 'Amount (USD)',
-                  prefixIcon: const Icon(Icons.attach_money),
+                  labelText: 'Amount (GHS)',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  filled: true,
-                  fillColor: AppColors.backgroundSecondary,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an amount';
-                  }
-                  final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0) {
-                    return 'Please enter a valid amount';
-                  }
-                  return null;
+                  final amount = double.tryParse(value ?? '');
+                  return DonationAmountLimits.validateGhsAmount(amount);
                 },
+                onChanged: (_) => setState(() => _selectedPreset = null),
               ),
-                        const SizedBox(height: AppSpacing.small),
-              
-              // Payment info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.warmBrown.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.warmBrown.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock, size: 16, color: AppColors.warmBrown),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Secure payment powered by Stripe',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.medium),
-              
-                // Donate button (always visible at bottom)
+              const SizedBox(height: AppSpacing.large),
               ElevatedButton(
                 onPressed: _isProcessing ? null : _handleDonate,
                 style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppColors.primaryMain,
+                  backgroundColor: AppColors.warmBrown,
                   foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: _isProcessing
                     ? const SizedBox(
@@ -272,24 +207,20 @@ class _DonationModalState extends State<DonationModal> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          color: Colors.white,
                         ),
                       )
-                    : Text(
-                        'Donate',
-                        style: AppTypography.body.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    : const Text('Continue to Paystack'),
               ),
-                ],
-            ),
+              TextButton(
+                onPressed:
+                    _isProcessing ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
         ),
       ),
-    ),
     );
   }
 }
-

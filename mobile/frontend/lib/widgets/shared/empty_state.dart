@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_typography.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -27,34 +29,28 @@ class EmptyState extends StatelessWidget {
             Icon(
               icon,
               size: 64,
-              color: Colors.grey[400],
+              color: AppColors.textTertiary,
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTypography.heading4.copyWith(
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).primaryColor,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
               ),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: onAction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                ),
                 child: Text(actionLabel!),
               ),
             ],
@@ -64,4 +60,3 @@ class EmptyState extends StatelessWidget {
     );
   }
 }
-

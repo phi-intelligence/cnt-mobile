@@ -1,26 +1,27 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/environment.dart';
 import '../utils/api_error_utils.dart';
 import '../utils/app_logger.dart';
 import '../utils/pinned_http_client.dart';
+import 'token_storage_service.dart';
 
 class AuthService {
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock_this_device,
-    ),
-  );
+  static final _storage = TokenStorageService.instance;
 
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'user_data';
+
+  /// Write session value (Android native prefs / iOS secure storage).
+  static Future<void> _write({required String key, required String? value}) =>
+      _storage.write(key: key, value: value);
+
+  static Future<String?> _read({required String key}) => _storage.read(key: key);
+
+  static Future<void> _delete({required String key}) => _storage.delete(key: key);
 
   static bool _isRefreshing = false;
   static Future<String?>? _refreshFuture;
@@ -68,10 +69,10 @@ class AuthService {
     }
   }
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
+  Future<String?> getToken() => _read(key: _tokenKey);
 
   Future<Map<String, dynamic>?> getUser() async {
-    final userJson = await _storage.read(key: _userKey);
+    final userJson = await _read(key: _userKey);
     if (userJson != null) {
       return jsonDecode(userJson) as Map<String, dynamic>;
     }
@@ -108,7 +109,7 @@ class AuthService {
     return user?['is_admin'] == true;
   }
 
-  Future<String?> getRefreshToken() => _storage.read(key: _refreshTokenKey);
+  Future<String?> getRefreshToken() => _read(key: _refreshTokenKey);
 
   Future<String?> refreshAccessToken() async {
     if (_isRefreshing) {
@@ -142,10 +143,10 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final newAccessToken = data['access_token'] as String;
-        await _storage.write(key: _tokenKey, value: newAccessToken);
+        await _write(key: _tokenKey, value: newAccessToken);
 
         if (data['refresh_token'] != null) {
-          await _storage.write(key: _refreshTokenKey, value: data['refresh_token']);
+          await _write(key: _refreshTokenKey, value: data['refresh_token'].toString());
         }
 
         if (data['user_id'] != null) {
@@ -177,9 +178,9 @@ class AuthService {
       AppLogger.warning('Failed to revoke refresh token on server', error: e);
     }
 
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _refreshTokenKey);
-    await _storage.delete(key: _userKey);
+    await _delete(key: _tokenKey);
+    await _delete(key: _refreshTokenKey);
+    await _delete(key: _userKey);
   }
 
   Future<Map<String, dynamic>> register({
@@ -277,7 +278,7 @@ class AuthService {
   Future<void> updateStoredUser(Map<String, dynamic> updates) async {
     final current = await getUser() ?? {};
     final merged = {...current, ...updates};
-    await _storage.write(key: _userKey, value: jsonEncode(merged));
+    await _write(key: _userKey, value: jsonEncode(merged));
   }
 
   Future<Map<String, dynamic>> sendOTP(String email) async {
@@ -371,15 +372,21 @@ class AuthService {
   }
 
   Future<void> _persistAuthData(Map<String, dynamic> data) async {
-    await _storage.write(key: _tokenKey, value: data['access_token']);
+    await _write(
+      key: _tokenKey,
+      value: data['access_token']?.toString(),
+    );
     if (data['refresh_token'] != null) {
-      await _storage.write(key: _refreshTokenKey, value: data['refresh_token']);
+      await _write(
+        key: _refreshTokenKey,
+        value: data['refresh_token'].toString(),
+      );
     }
     await _persistUserProfile(data);
   }
 
   Future<void> _persistUserProfile(Map<String, dynamic> data) async {
-    await _storage.write(
+    await _write(
       key: _userKey,
       value: jsonEncode({
         'id': data['user_id'],

@@ -9,6 +9,7 @@ import '../../theme/app_typography.dart';
 import '../../theme/app_spacing.dart';
 import '../video/video_player_full_screen.dart';
 import '../audio/audio_player_full_screen_new.dart';
+import '../../utils/bank_details_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Artist Profile Screen - View any artist's public profile
@@ -268,21 +269,51 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
                       ),
                       const SizedBox(height: AppSpacing.large),
                       
-                      // Follow button
-                      Center(
-                        child: ElevatedButton.icon(
-                          onPressed: _isProcessing ? null : _toggleFollow,
-                          icon: Icon(_isFollowing ? Icons.check : Icons.person_add),
-                          label: Text(_isFollowing ? 'Following' : 'Follow'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isFollowing ? AppColors.warmBrown : AppColors.accentMain,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
+                      // Follow + Donate
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _isProcessing ? null : _toggleFollow,
+                              icon: Icon(
+                                  _isFollowing ? Icons.check : Icons.person_add),
+                              label: Text(_isFollowing ? 'Following' : 'Follow'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _isFollowing
+                                    ? AppColors.warmBrown
+                                    : AppColors.accentMain,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                showDonationModalIfEligible(
+                                  context,
+                                  recipientUserId: artist.userId,
+                                  recipientName: artist.artistName,
+                                );
+                              },
+                              icon: const Icon(Icons.volunteer_activism),
+                              label: const Text('Donate'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.warmBrown,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       
                       // Bio
@@ -320,9 +351,6 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
                 delegate: _TabBarDelegate(
                   TabBar(
                     controller: _tabController,
-                    labelColor: AppColors.accentMain,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: AppColors.accentMain,
                     tabs: [
                       Tab(text: 'Video Podcasts (${videoPodcasts.length})'),
                       Tab(text: 'Audio Podcasts (${audioPodcasts.length})'),
@@ -434,7 +462,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.person_off, size: 64, color: Colors.grey),
+          const Icon(Icons.person_off, size: 64, color: AppColors.textTertiary),
           const SizedBox(height: 16),
           Text(
             'Artist not found',
@@ -456,7 +484,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
         Text(
           value,
           style: AppTypography.heading2.copyWith(
-            color: AppColors.accentMain,
+            color: AppColors.interactive,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -486,7 +514,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
     if (socialLinks.containsKey('instagram') && socialLinks['instagram']!.isNotEmpty) {
       links.add(IconButton(
         icon: const Icon(Icons.camera_alt),
-        color: AppColors.accentMain,
+        color: AppColors.primaryMain,
         onPressed: () => _launchUrl(socialLinks['instagram']!),
         tooltip: 'Instagram',
       ));
@@ -494,7 +522,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
     if (socialLinks.containsKey('twitter') && socialLinks['twitter']!.isNotEmpty) {
       links.add(IconButton(
         icon: const Icon(Icons.chat),
-        color: AppColors.accentMain,
+        color: AppColors.primaryMain,
         onPressed: () => _launchUrl(socialLinks['twitter']!),
         tooltip: 'Twitter',
       ));
@@ -502,7 +530,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
     if (socialLinks.containsKey('youtube') && socialLinks['youtube']!.isNotEmpty) {
       links.add(IconButton(
         icon: const Icon(Icons.play_circle_outline),
-        color: AppColors.accentMain,
+        color: AppColors.primaryMain,
         onPressed: () => _launchUrl(socialLinks['youtube']!),
         tooltip: 'YouTube',
       ));
@@ -510,7 +538,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
     if (socialLinks.containsKey('website') && socialLinks['website']!.isNotEmpty) {
       links.add(IconButton(
         icon: const Icon(Icons.language),
-        color: AppColors.accentMain,
+        color: AppColors.primaryMain,
         onPressed: () => _launchUrl(socialLinks['website']!),
         tooltip: 'Website',
       ));
@@ -518,7 +546,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
     if (socialLinks.containsKey('facebook') && socialLinks['facebook']!.isNotEmpty) {
       links.add(IconButton(
         icon: const Icon(Icons.facebook),
-        color: AppColors.accentMain,
+        color: AppColors.primaryMain,
         onPressed: () => _launchUrl(socialLinks['facebook']!),
         tooltip: 'Facebook',
       ));
@@ -536,12 +564,12 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
             Icon(
               isVideo ? Icons.videocam_off : Icons.music_off,
               size: 64,
-              color: Colors.grey,
+              color: AppColors.textTertiary,
             ),
             const SizedBox(height: 16),
             Text(
               'No ${isVideo ? 'video' : 'audio'} podcasts yet',
-              style: AppTypography.body.copyWith(color: Colors.grey),
+              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -646,7 +674,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> with SingleTi
               IconButton(
                 icon: Icon(
                   isVideo ? Icons.play_circle_filled : Icons.play_arrow,
-                  color: AppColors.accentMain,
+                  color: AppColors.interactive,
                   size: 40,
                 ),
                 onPressed: () => isVideo ? _handlePlayVideo(podcast) : _handlePlayAudio(podcast),
